@@ -667,7 +667,7 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
     private void applyScrim(boolean on) {
         float d = cfg.wallpaperDim / 100f;
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{
-                Dss.withAlpha(dss.bg, Math.min(0.92f, d * 1.35f)), Dss.withAlpha(dss.bg, d * 0.7f),
+                Dss.withAlpha(dss.bg, Math.min(0.92f, d * 1.7f)), Dss.withAlpha(dss.bg, Math.min(0.92f, d * 1.25f)), Dss.withAlpha(dss.bg, d * 0.7f),
                 Dss.withAlpha(dss.bg, Math.min(0.92f, d * 1.22f)), Dss.withAlpha(dss.bg, Math.min(0.92f, d * 1.9f))});
         scrim.setBackground(g);
         scrim.animate().alpha(on ? 1f : 0f).setDuration(350).start();
