@@ -60,4 +60,15 @@ public class ConfigTest {
         b.columns = 6;
         assertEquals(4, a.columns);
     }
+
+    @Test public void dockTakesInputsWithLabels() {
+        Config c = Config.parse("{\"dock_apps\":[\"com.ugreen.nasprotv\",\"input:com.tcl.tvinput/.TvPassThroughService/HW16\"],"
+                + "\"input_labels\":{\"input:com.tcl.tvinput/.TvPassThroughService/HW16\":\"Switch 2\",\"nope\":\"x\",\"input:a\":3}}");
+        String hdmi = c.dockApps.get(1);
+        assertTrue(Config.isInput(hdmi));
+        assertFalse(Config.isInput(c.dockApps.get(0)));
+        assertEquals("com.tcl.tvinput/.TvPassThroughService/HW16", Config.inputId(hdmi));
+        assertEquals("Switch 2", c.inputLabels.get(hdmi));
+        assertEquals("only input: keys with text values", 1, c.inputLabels.size());
+    }
 }

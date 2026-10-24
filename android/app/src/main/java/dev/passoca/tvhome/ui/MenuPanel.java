@@ -62,7 +62,7 @@ final class MenuPanel extends FrameLayout {
         this.items = items;
         this.back = back;
         setBackground(dss.box(dss.bgElev, dss.line));
-        setElevation(dss.dpf(12));
+        setElevation(dss.dpf(24));   // above the settings sheet (16) it can open from
         int pad = dss.dp(4);
         setPadding(pad, pad, pad, pad);
 

@@ -1,4 +1,4 @@
-<title>dssoca TV Home</title>
+<title>tvssoca</title>
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="stylesheet" href="dssoca/theme.css">
 <link rel="stylesheet" href="dssoca/vanilla.css">
@@ -31,7 +31,8 @@ body{margin:0;background:var(--ss-bg);color:var(--ss-fg);font-family:var(--ss-fo
 .tv .layer-fill{position:absolute;inset:0}
 .tv-wall{background-size:cover;background-position:center;opacity:0;transition:opacity var(--ss-dur-xslow) var(--ss-ease)}
 .tv-wall.on{opacity:1}
-.tv-wallscrim{background:linear-gradient(to bottom, color-mix(in srgb,var(--ss-bg) 35%,transparent), color-mix(in srgb,var(--ss-bg) 55%,transparent) 55%, color-mix(in srgb,var(--ss-bg) 85%,transparent));opacity:0;transition:opacity var(--ss-dur-slow)}
+/* wallpaper_dim as a vertical scrim (HomeActivity.applyScrim): --dim is set from the config */
+.tv-wallscrim{--dim:.45;background:linear-gradient(to bottom, color-mix(in srgb,var(--ss-bg) calc(var(--dim)*78%),transparent), color-mix(in srgb,var(--ss-bg) min(92%, calc(var(--dim)*122%)),transparent) 50%, color-mix(in srgb,var(--ss-bg) min(92%, calc(var(--dim)*190%)),transparent));opacity:0;transition:opacity var(--ss-dur-slow)}
 .tv-wallscrim.on{opacity:1}
 .tv-grid-bg{background-image:linear-gradient(var(--ss-line) 1px,transparent 1px),linear-gradient(90deg,var(--ss-line) 1px,transparent 1px);
   background-size:48px 48px;background-position:-1px -1px;opacity:.35;
@@ -59,16 +60,6 @@ body{margin:0;background:var(--ss-bg);color:var(--ss-fg);font-family:var(--ss-fo
 .tv-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
 .tv-pills{display:flex;align-items:stretch;gap:var(--ss-gap-sm)}
 .tv-caption{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ss-fg-faint);min-height:14px;transition:opacity var(--ss-dur)}
-/* header module cards (weather, world clock): MetricTile-shaped readouts in the top row */
-.tv-wid{display:flex;align-items:center;gap:10px;padding:0 12px;box-sizing:border-box;cursor:pointer;
-  border:1px solid var(--ss-line);background:color-mix(in srgb,var(--ss-bg) 72%,transparent);backdrop-filter:blur(6px);
-  transition:border-color var(--ss-dur-fast) var(--ss-ease), box-shadow var(--ss-dur-fast) var(--ss-ease), background var(--ss-dur-fast)}
-.tv-wid .wk{display:flex;flex-direction:column;gap:1px}
-.tv-wid .wk span:first-child{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ss-fg-faint);display:flex;align-items:center;gap:5px}
-.tv-wid .wk span:first-child i{width:5px;height:5px;display:block}
-.tv-wid .wk span+span{font-size:var(--ss-ui-xs);color:var(--ss-fg-muted);white-space:nowrap}
-.tv-wid .wv{font-family:var(--ss-font-display);font-size:22px;line-height:1;color:var(--ss-fg-shine);font-variant-numeric:tabular-nums}
-.tv-wid.is-focus{border-color:var(--ss-primary);background:var(--ss-primary-soft);box-shadow:var(--ss-shadow-glow)}
 .tv-pills .ss-btn{background:color-mix(in srgb,var(--ss-bg) 72%,transparent);backdrop-filter:blur(6px);white-space:nowrap}
 .tv-pills .ss-btn svg{width:var(--ss-icon);height:var(--ss-icon);fill:currentColor}
 .tv-pills .ss-btn.primary{transform:translateY(-1px)}
@@ -93,18 +84,12 @@ body{margin:0;background:var(--ss-bg);color:var(--ss-fg);font-family:var(--ss-fo
 .tv-tile.is-focus .tv-name.on{opacity:1;transform:none}
 @keyframes tv-tile-in{from{opacity:0;transform:translateY(22%) scale(.94)}to{opacity:1;transform:none}}
 .tv-tile.enter .in{animation:tv-tile-in 420ms var(--ss-ease) both;animation-delay:inherit}
-/* module card tile: a MetricTile-shaped readout */
-.tv-mod{flex-direction:column;align-items:flex-start;justify-content:space-between;padding:12px 14px;box-sizing:border-box;background:var(--ss-bg-elev)}
-.tv-mod .k{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ss-fg-faint);display:flex;align-items:center;gap:6px}
-.tv-mod .k i{width:6px;height:6px;display:block}
-.tv-mod .v{font-family:var(--ss-font-display);font-size:30px;line-height:1;color:var(--ss-fg-shine);font-variant-numeric:tabular-nums}
-.tv-mod .s{font-size:11px;color:var(--ss-fg-muted)}
 
 /* focus frame: the launcher's GlassView, redrawn as a dssoca focus ring */
 .tv-frame{position:absolute;left:0;top:0;opacity:0;pointer-events:none;box-sizing:border-box;border:2px solid var(--ss-primary);
-  box-shadow:var(--ss-shadow-glow), inset 0 0 0 1px color-mix(in srgb,var(--ss-bg) 60%,transparent);
-  transition:opacity var(--ss-dur-fast), border-color var(--ss-dur), box-shadow var(--ss-dur);will-change:transform,width,height}
-.tv-frame.reorder{border-color:var(--ss-blue);box-shadow:0 0 24px color-mix(in srgb,var(--ss-blue) 35%,transparent)}
+  box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--ss-bg) 60%,transparent);
+  transition:opacity var(--ss-dur-fast), border-color var(--ss-dur);will-change:transform,width,height}
+.tv-frame.reorder{border-color:var(--ss-blue)}
 
 /* hero shelf */
 .tv-hero{position:absolute;left:66px;pointer-events:none;transition:opacity var(--ss-dur-fast)}
@@ -128,6 +113,9 @@ body{margin:0;background:var(--ss-bg);color:var(--ss-fg);font-family:var(--ss-fo
 .tv-sheet .srcline span:first-of-type{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tv-sheet .pickv{display:flex;align-items:center;gap:10px;color:var(--ss-fg-muted);font-size:var(--ss-ui-sm)}
 .tv-sheet .pickv .thumb{width:48px;height:27px;background-size:cover;background-position:center;box-shadow:0 0 0 1px var(--ss-line)}
+.tv-help{position:absolute;width:560px;z-index:10;box-shadow:var(--ss-shadow-pop);animation:tv-fade var(--ss-dur) var(--ss-ease) both}
+.tv-help .rows{display:grid;grid-template-columns:130px minmax(0,1fr);gap:10px 0;align-items:center;font-size:var(--ss-ui-sm);color:var(--ss-fg-muted)}
+.tv-help .rows .ss-kbd{justify-self:start}
 .tv-menu .cap{padding:6px 16px 8px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ss-fg-faint)}
 
 /* launcher settings: dssoca Card with Segmented, Switch and Button controls */
@@ -184,7 +172,7 @@ body{margin:0;background:var(--ss-bg);color:var(--ss-fg);font-family:var(--ss-fo
 <div class="app" id="app" data-theme="dark" data-size-variant="md">
 <div class="shell">
   <div class="intro">
-    <h1 class="ss-heading accent" data-size-variant="sm"><span class="txt">TV Home</span></h1>
+    <h1 class="ss-heading accent" data-size-variant="sm"><span class="txt">tvssoca</span></h1>
     <p>The CleanYourTV launcher interface rebuilt on <b>dssoca 0.19</b>. Behaviour, geometry and focus physics are the launcher's; every surface, colour and type choice is a dssoca token or component. Click the screen and drive it with a remote.</p>
   </div>
 
@@ -237,10 +225,10 @@ body{margin:0;background:var(--ss-bg);color:var(--ss-fg);font-family:var(--ss-fo
 
 /* ═════════════════════════════════════════════════════════════════════════
    1. CONFIG — same keys as launcher/app/src/main/res/values/config.xml and a
-      theme's config.json (themes/README.md). A TV build reads the same object.
+      config.json. The TV build (core/Config) reads the same keys.
    ═════════════════════════════════════════════════════════════════════════ */
 const CONFIG = {
-  dock_apps: ["flick","tide","loop","star"],
+  dock_apps: ["flick","tide","loop","star","hdmi2"],   // "hdmi2" stands for an "input:<id>" entry
   // header line under the date, computed by the launcher itself (no add-on app needed)
   weather: {latitude: null, longitude: null, units: "celsius", refresh_minutes: 30},  // Open-Meteo, no API key
   world_clocks: [{label: "Tokyo", tz: "Asia/Tokyo"}],                                 // IANA zones, offline, DST-aware
@@ -251,7 +239,7 @@ const CONFIG = {
   ambient_glow: true,
   dock_title: true,
   reduced_motion: matchMedia("(prefers-reduced-motion: reduce)").matches,
-  // wallpapers: the theme's wallpapers/ folder (JPEG, PNG or WebP; up to 100 pictures of 10 MB)
+  // wallpapers: the synced GitHub folder (JPEG, PNG or WebP; up to 100 pictures of 10 MB)
   wallpaper: true,                      // false draws no picture
   wallpaper_rotation_minutes: 60,       // 0 keeps one picture
   wallpaper_order: "shuffle",           // shuffle | sequential (filename order, wraps)
@@ -289,6 +277,8 @@ const CATALOG = {
   kanal:{label:"Kanal Live", color:"#12A383", bg:"#0E7C66", logo:'<span style="display:flex;align-items:center;gap:10px;'+MARK+';font-size:30px;color:#fff;letter-spacing:.06em">KANAL<span style="font-size:13px;letter-spacing:.12em;background:#fff;color:#0E7C66;padding:3px 7px">LIVE</span></span>'},
   surf:{label:"Surf Browser", color:"#3D7BFF", bg:"#18181B", logo:'<span style="display:flex;align-items:center;gap:10px;'+MARK+';font-size:32px;color:#fff"><svg width="32" height="32" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="#3D7BFF" stroke-width="2"/><path d="M2 12h20M12 2c3 3 3 17 0 20M12 2c-3 3-3 17 0 20" fill="none" stroke="#3D7BFF" stroke-width="1.6"/></svg>Surf</span>'}
 };
+/* a TV input on the dock (dock_apps "input:<id>", named by input_labels) */
+CATALOG.hdmi2 = {label:"Switch 2", input:true, color:"#66ef73", bg:"var(--ss-bg-elev)", logo:'<span style="display:flex;flex-direction:column;align-items:center;gap:8px;color:var(--ss-fg);font-size:13px"><svg viewBox="0 0 24 24" width="40" height="40"><path fill="currentColor" d="M18,7V4c0,-1.1 -0.9,-2 -2,-2H8C6.9,2 6,2.9 6,4v3H5v6l3,6v3h8v-3l3,-6V7H18zM8,4h8v3h-2V5h-1v2h-2V5h-1v2H8V4z"/></svg>Switch 2</span>'};
 const GRID_APPS = ["cine","arca","pulse","lumen","kanal","surf"];
 const INPUTS = [
   {id:"HW1", label:"HDMI 1"},
@@ -312,6 +302,8 @@ const ICON = {
   card:'M3 5h18v14H3zm2 2v10h14V7zm2 2h6v2H7zm0 4h10v2H7z',
   rotate:'M12 4V1L8 5l4 4V6a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z',
   none:'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 0 1 6.3 12.9L7.1 5.7A8 8 0 0 1 12 4zM4 12c0-1.8.6-3.5 1.7-4.9l11.2 11.2A8 8 0 0 1 4 12z',
+  tune:'M3 17v2h6v-2zM3 5v2h10V5zm10 16v-2h8v-2h-8v-2h-2v6zM7 9v2H3v2h4v2h2V9zm14 4v-2H11v2zm-6-4h2V7h4V5h-4V3h-2z',
+  help:'M11 18h2v-2h-2zm1-16a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16zm0-14a4 4 0 0 0-4 4h2a2 2 0 1 1 4 0c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5a4 4 0 0 0-4-4z',
   check:'M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z'
 };
 const svg = (name) => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="'+ICON[name]+'"/></svg>';
@@ -335,7 +327,7 @@ const Info = {
    3. STORE — one state object; every change goes through dispatch()
    ═════════════════════════════════════════════════════════════════════════ */
 const TOP = [
-  {id:"inputs", label:"Inputs", icon:"input"}, {id:"wifi", label:"Wi-Fi: Livingroom 5G", icon:"wifi"}, {id:"settings", label:"Settings", icon:"settings"}];
+  {id:"inputs", label:"Inputs", icon:"input"}, {id:"wifi", label:"Wi-Fi: Livingroom 5G", icon:"wifi"}, {id:"launcher", label:"Launcher settings", icon:"tune"}, {id:"settings", label:"Settings", icon:"settings"}, {id:"help", label:"Help", icon:"help"}];
 const TOP_INDEX = Object.fromEntries(TOP.map((t,i) => [t.id, i]));
 
 const state = {
@@ -346,10 +338,10 @@ const state = {
   reorder: false, picked: false,
   menu: null,               // {kind, items, sel, anchor, back}
   sheet: null,              // {row, col}
+  help: false,              // the Help button's card
   screen: null,             // {title, sub, art}
-  wallpaperChoice: null,    // null = rotate the collection (theme default) | "none" | a file name
-  wallIndex: 0, wallSince: Date.now(),
-  lastOpened: {}
+  wallpaperChoice: null,    // null = rotate the folder | "none" | a file name
+  wallIndex: 0, wallSince: Date.now()
 };
 const listeners = [];
 function dispatch(action, payload){ reduce(action, payload); listeners.forEach(fn => fn(action)); }
@@ -379,12 +371,13 @@ function reduce(a, p){
     case "closeMenu": s.zone = s.menu ? s.menu.back : "top"; s.menu = null; break;
     case "openSheet": s.menu = null; s.sheet = s.sheet || {row:0, col:0}; s.zone = "sheet"; break;
     case "closeSheet": s.sheet = null; s.zone = "top"; break;
-    case "openScreen": s.zoneBefore = s.zone==="menu" ? (s.menu.back==="sheet"?"top":s.menu.back) : s.zone; s.menu = null; s.sheet = null; s.screen = p; s.zone = "screen"; break;
+    case "openHelp": s.menu = null; s.help = true; s.zone = "help"; break;
+    case "closeHelp": s.help = false; s.zone = "top"; break;
+    case "openScreen": s.zoneBefore = s.zone==="menu" ? (s.menu.back==="sheet"?"top":s.menu.back) : s.zone==="help" ? "top" : s.zone; s.menu = null; s.sheet = null; s.help = false; s.screen = p; s.zone = "screen"; break;
     case "closeScreen": s.screen = null; s.zone = s.zoneBefore || "tiles"; break;
-    case "launch": s.lastOpened[p] = Date.now(); break;
     case "reorder": s.reorder = p; s.picked = false; s.menu = null; if(p) s.zone = "tiles"; break;
     case "pick": s.picked = p; break;
-    case "home": s.menu=null; s.sheet=null; s.screen=null; s.reorder=false; s.picked=false; s.zone="tiles"; s.tile=0; s.scroll=0; break;
+    case "home": s.menu=null; s.sheet=null; s.help=false; s.screen=null; s.reorder=false; s.picked=false; s.zone="tiles"; s.tile=0; s.scroll=0; break;
     case "setCfg": Object.assign(s.cfg, p); if(p.columns){ s.tile = Math.min(s.tile, n-1); scrollIntoView(); } break;
     case "resetCfg": s.cfg = {...CONFIG}; s.order = [...CONFIG.dock_apps, ...GRID_APPS]; s.wallpaperChoice = null; break;
     case "chooseWallpaper": s.wallpaperChoice = p;
@@ -476,14 +469,7 @@ const View = {
   top(){
     const box = $("#top"); box.innerHTML = "";
     TOP.forEach((t,k) => {
-      let el;
-      if(t.card){
-        const a = CATALOG[t.id];
-        el = h('<div class="tv-wid" role="button" aria-label="'+a.label+'" data-top="'+k+'"><span class="wv" data-mod="'+t.id+'">'+a.module.value()+'</span>'
-          +'<span class="wk"><span><i style="background:'+a.color+'"></i>'+a.module.key+'</span><span data-modsub="'+t.id+'">'+a.module.sub()+'</span></span></div>');
-      } else {
-        el = h('<button class="ss-btn secondary icon-only" type="button" tabindex="-1" data-top="'+k+'" aria-label="'+t.label+'" title="'+t.label+'"><span class="affix" aria-hidden="true">'+svg(t.icon)+'</span></button>');
-      }
+      const el = h('<button class="ss-btn secondary icon-only" type="button" tabindex="-1" data-top="'+k+'" aria-label="'+t.label+'" title="'+t.label+'"><span class="affix" aria-hidden="true">'+svg(t.icon)+'</span></button>');
       el.addEventListener("click", () => { dispatch("focusTop", k); Input.press("DPAD_CENTER"); });
       box.appendChild(el);
     });
@@ -554,13 +540,25 @@ const View = {
       if(r.break){ html += '</div><div class="col">'; return; }
       if(r.group){ html += '<div class="group">'+r.group+'</div>'; return; }
       if(r.type==="info"){ const src = WALLPAPER_SOURCE; html += '<div class="srcline">'+svg("rotate")+'<span>'+src.repo+' / '+src.path+'</span><span class="ss-badge neutral" data-size-variant="sm">'+src.snapshot+'</span></div>'; return; }
-      if(r.type==="acts"){ html += '</div><div class="acts"><button type="button" class="ss-btn secondary" tabindex="-1"><span class="label">Follow theme</span></button><button type="button" class="ss-btn ghost" tabindex="-1"><span class="label">Choose default home</span></button></div>'; return; }
+      if(r.type==="acts"){ html += '</div><div class="acts"><button type="button" class="ss-btn secondary" tabindex="-1"><span class="label">Follow config</span></button><button type="button" class="ss-btn ghost" tabindex="-1"><span class="label">Choose default home</span></button></div>'; return; }
       const ctrl = r.type==="seg" ? seg(r) : r.type==="sw" ? sw(r) : pick();
       html += '<div class="srow'+(r.type==="pick"?' pick':'')+'" data-row="'+r.key+'"><div class="slab"><span>'+r.label+'</span><span>'+r.key+'</span></div>'+ctrl+'</div>';
     });
     const el = h('<div class="ss-card tv-sheet" data-size-variant="md">'
       +'<div class="head"><div class="heading"><div class="title" role="heading" aria-level="2">Launcher settings</div></div><div class="actions"><div class="meta">esc to close</div></div></div>'
       +'<div class="body"><div class="rows">'+html+'</div></div></div>');
+    ov.appendChild(el);
+  },
+  /* Help: dssoca Card listing the launcher's keys as Kbd chips, under the Help button */
+  help(){
+    const ov = $("#overlay"); ov.querySelector(".tv-help")?.remove();
+    if(!state.help) return;
+    const kbd = k => '<kbd class="ss-kbd" data-hide-on-mobile="false"><kbd class="key">'+k+'</kbd></kbd>';
+    const el = h('<div class="ss-card tv-help" data-size-variant="md">'
+      +'<div class="head"><div class="heading"><div class="title" role="heading" aria-level="2">Using the launcher</div></div><div class="actions"><div class="meta">back to close</div></div></div>'
+      +'<div class="body"><div class="rows">'+HELP.map(([k,t]) => kbd(k)+'<span>'+t+'</span>').join("")+'</div></div></div>');
+    const tr = tv.getBoundingClientRect(), r = $('#top [data-top="'+TOP_INDEX.help+'"]').getBoundingClientRect(), sc = tr.width/960;
+    el.style.right = (960-(r.right-tr.left)/sc)+"px"; el.style.top = ((r.bottom-tr.top)/sc+8)+"px";
     ov.appendChild(el);
   },
   screen(){
@@ -595,6 +593,17 @@ const SHEET = [
   {type:"sw", key:"ambient_glow", label:"App glow"},
   {type:"acts"}
 ];
+/* Help card rows: the same text as the TV build's strings.xml help_* */
+const HELP = [
+  ["← ↑ → ↓", "Move between apps. Up from the dock reaches the top buttons"],
+  ["OK", "Open the app, input or button. The sliders button opens Launcher settings"],
+  ["Hold OK · app", "App info: force stop, storage, disable"],
+  ["Hold OK · gear", "Launcher menu: Launcher settings and Reorder apps"],
+  ["Back", "From the grid, return to the dock. Closes menus"],
+  ["Home", "Return to the first app with everything closed"],
+  ["Reorder", "OK picks up an app, arrows move it, Back places it, Back again saves"],
+  ["config.json", "Android/data/dev.passoca.tvhome/files/config.json. Follow config in Launcher settings drops the choices made on the TV"]
+];
 const SHEET_ROWS = SHEET.filter(r => !r.group && !r.break && r.type!=="info");
 
 /* sync(): apply state to the built DOM (cheap; runs after every dispatch) */
@@ -603,8 +612,7 @@ function sync(action){
   document.querySelectorAll("#top [data-top]").forEach(el => {
     const k = +el.dataset.top, t = TOP[k];
     const open = s.menu && s.menu.back!=="sheet" && ((s.menu.kind==="inputs" && t.id==="inputs") || (s.menu.kind!=="inputs" && t.id==="settings"));
-    const f = (s.zone==="top" && k===s.top) || open;
-    if(t.card){ el.classList.toggle("is-focus", f); return; }
+    const f = (s.zone==="top" && k===s.top) || open || (s.help && t.id==="help") || (s.sheet && t.id==="launcher");
     el.classList.toggle("primary", f); el.classList.toggle("secondary", !f);
     el.classList.toggle("is-armed", s.reorder && t.id==="settings");
   });
@@ -627,7 +635,6 @@ function sync(action){
     Glow.set(s.cfg.ambient_glow ? CATALOG[id].color : null);
   } else {
     Motion.show(false);
-    if(s.zone==="top" && TOP[s.top].card) Glow.set(s.cfg.ambient_glow ? CATALOG[TOP[s.top].id].color : null);
   }
   // hero shelf
   const hero = $("#hero"), showHero = dock && !s.reorder && s.cfg.dock_title;
@@ -639,7 +646,7 @@ function sync(action){
   }
   hero.style.opacity = showHero ? 1 : 0;
   // overlays
-  if(["openMenu","closeMenu","openSheet","closeSheet","openScreen","closeScreen","home","reorder","chooseWallpaper","setCfg","resetCfg"].includes(action)){ View.sheet(); View.menu(); View.screen(); }
+  if(["openMenu","closeMenu","openSheet","closeSheet","openHelp","closeHelp","openScreen","closeScreen","home","reorder","chooseWallpaper","setCfg","resetCfg"].includes(action)){ View.sheet(); View.menu(); View.help(); View.screen(); }
   if(s.menu){ s.menu.items.forEach((it,k) => it.el && it.el.classList.toggle("is-focus", k===s.menu.sel));
     const f = s.menu.items[s.menu.sel].el, panel = f && f.parentElement;   // keep the focused row inside a scrolling panel
     if(f && panel.scrollHeight > panel.clientHeight){
@@ -663,7 +670,6 @@ function syncSheet(){
     else row.classList.add("is-focus");
   }
 }
-function ago(t){ const s=(Date.now()-t)/1000; if(s<60) return "just now"; const m=Math.round(s/60); return m+" min ago"; }
 
 /* ═════════════════════════════════════════════════════════════════════════
    6. FOCUS ENGINE — one handler per zone; keys are Android key names
@@ -688,8 +694,9 @@ const Zones = {
     if(key==="DPAD_RIGHT") return dispatch("focusTop", Math.min(TOP.length-1, state.top+1));
     if(key==="DPAD_DOWN" || key==="BACK") return dispatch("focusTile", state.dockReturn);
     if(key==="DPAD_CENTER"){
-      if(t.card) return Actions.launch(t.id);
       if(t.id==="inputs") return Actions.inputs();
+      if(t.id==="help") return dispatch("openHelp");
+      if(t.id==="launcher") return dispatch("openSheet");
       if(t.id==="wifi") return Actions.screen("Wi-Fi","The TV's own network settings open here. Holding OK opens them too.");
       return Actions.screen("Settings","The TV's own Settings app opens here. The launcher writes no system settings itself.");
     }
@@ -716,20 +723,18 @@ const Zones = {
       if(r.key==="wallpaper_rotation_minutes") View.toast(v ? "A new picture every "+v+" min" : "Rotation off: the current picture stays"); }
     else if(r.type==="sw"){ dispatch("setCfg", {[r.key]: !state.cfg[r.key]}); View.placeTiles(false); }
     else if(r.type==="pick") Actions.wallpaperPicker();
-    else if(sh.col===0){ dispatch("resetCfg"); View.tiles(true); View.toast("Back to the theme's settings","success"); }
+    else if(sh.col===0){ dispatch("resetCfg"); View.tiles(true); View.toast("Back to the config's settings","success"); }
     else View.toast("This launcher is Home. Choosing the original home hands Home back to it.");
   },
+  help(key){ if(key==="BACK" || key==="DPAD_CENTER") dispatch("closeHelp"); },
   screen(key){ if(key==="BACK") Actions.closeScreen(); }
 };
 
 const Actions = {
   launch(id){
-    dispatch("launch", id);
     const a = CATALOG[id];
-    const art = a.module
-      ? '<div class="art tv-wid" style="height:auto;padding:22px 28px;gap:18px;cursor:default"><span class="wv" style="font-size:64px">'+a.module.value()+'</span><span class="wk"><span><i style="background:'+a.color+'"></i>'+a.module.key+'</span><span>'+a.module.sub()+'</span></span></div>'
-      : '<div class="art" style="background:'+a.bg+'"><div style="transform:scale(1.4)">'+a.logo+'</div></div>';
-    Actions.screen(a.label, a.label+" would open here. On the TV this is the app's own activity.", art);
+    const art = '<div class="art" style="background:'+a.bg+'"><div style="transform:scale(1.4)">'+a.logo+'</div></div>';
+    Actions.screen(a.label, a.input ? "HDMI 2 · the TV switches to this input." : a.label+" would open here. On the TV this is the app's own activity.", art);
   },
   screen(title, sub, art){
     const home = $("#home"), anim = state.cfg.animations && !state.cfg.reduced_motion;
@@ -752,13 +757,13 @@ const Actions = {
   launcherMenu(){
     dispatch("openMenu", {kind:"launcher", anchor:Actions.topAnchor("settings"), items:[
       {label:"Launcher settings", icon:"home", act:() => dispatch("openSheet")},
-      {label:"Module cards", icon:"card", act:() => { dispatch("closeMenu"); View.toast("weather: shown · world clock: shown"); }},
       {label:"Reorder apps", icon:"swap", act:() => { dispatch("reorder", true); View.toast("OK picks up an app, arrows move it, Back places it. Back again to finish."); }}
     ]});
   },
   quickPanel(){
     if(state.zone==="screen") Actions.closeScreen();
     if(state.zone==="sheet") dispatch("closeSheet");
+    if(state.zone==="help") dispatch("closeHelp");
     dispatch("openMenu", {kind:"quick", anchor:Actions.topAnchor("settings"), items:[
       {label:"TV system settings", icon:"settings", act:() => Actions.screen("Settings","The TV's own Settings app opens here.")},
       {label:"Display", icon:"picture", act:() => Actions.screen("Display","The TV's display settings open here.")},
@@ -767,14 +772,14 @@ const Actions = {
       {label:"Launcher settings", icon:"home", act:() => dispatch("openSheet")}
     ]});
   },
-  /* LauncherSettingsActivity.showWallpaperPicker: one picture from the collection, None, or Theme default */
+  /* Wallpaper picker: rotate the folder, one picture from it, or none */
   wallpaperPicker(){
     const ch = state.wallpaperChoice;
     const done = (v, msg) => { dispatch("chooseWallpaper", v); dispatch("closeMenu"); View.toast(msg, "success"); };
     const items = [
-      {label:"Rotate the folder ("+WALLPAPERS.length+")", icon:"rotate", selected: ch===null, act:() => done(null, "Rotating the collection again")},
+      {label:"Rotate the folder ("+WALLPAPERS.length+")", icon:"rotate", selected: ch===null, act:() => done(null, "Rotating the folder again")},
       {sep:true},
-      ...WALLPAPERS.map(w => ({label:w.caption, thumb:w.src, selected: ch===w.file, act:() => done(w.file, "Wallpaper changed. Rotation stops until you choose Theme default")})),
+      ...WALLPAPERS.map(w => ({label:w.caption, thumb:w.src, selected: ch===w.file, act:() => done(w.file, "Wallpaper changed. Rotation stops until you choose Rotate")})),
       {sep:true},
       {label:"None", icon:"none", selected: ch==="none", act:() => done("none", "No wallpaper")}
     ];
@@ -825,7 +830,7 @@ const Wall = (() => {
   return { set(src){
     if(src===current) return; current=src;
     const F=$("#wall"+front), B=$("#wall"+(front==="A"?"B":"A"));
-    $("#wallScrim").classList.toggle("on", !!src);
+    $("#wallScrim").classList.toggle("on", !!src); $("#wallScrim").style.setProperty("--dim", state.cfg.wallpaper_dim/100);
     if(!src){ F.classList.remove("on"); B.classList.remove("on"); return; }
     B.style.backgroundImage="url('"+src+"')"; B.classList.add("on"); F.classList.remove("on"); front = front==="A"?"B":"A";
   }};

@@ -94,11 +94,10 @@ final class Views {
         }
     }
 
-    /** The focus frame: GlassView redrawn as a square dssoca ring (2 dp accent, soft glow), placed by a spring. */
+    /** The focus frame: GlassView redrawn as a square dssoca ring (2 dp accent, no glow), placed by a spring. */
     static final class FocusFrameView extends View {
         private final Dss dss;
-        private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG), glow = new Paint(Paint.ANTI_ALIAS_FLAG),
-                inner = new Paint(Paint.ANTI_ALIAS_FLAG);
+        private final Paint stroke = new Paint(Paint.ANTI_ALIAS_FLAG), inner = new Paint(Paint.ANTI_ALIAS_FLAG);
         private final RectF rect = new RectF();
         private int color;
         boolean shown;
@@ -109,7 +108,6 @@ final class Views {
             color = dss.primary;
             stroke.setStyle(Paint.Style.STROKE);
             stroke.setStrokeWidth(dss.dpf(2));
-            glow.setStyle(Paint.Style.STROKE);
             inner.setStyle(Paint.Style.STROKE);
             inner.setStrokeWidth(dss.dpf(1));
             inner.setColor(Dss.withAlpha(dss.bg, 0.6f));
@@ -125,14 +123,6 @@ final class Views {
 
         @Override protected void onDraw(Canvas c) {
             if (!shown || rect.isEmpty()) return;
-            int rings = 8;
-            float reach = dss.dpf(12);
-            for (int i = 0; i < rings; i++) {
-                float o = reach * (i + 0.5f) / rings;
-                glow.setStrokeWidth(reach / rings + 0.5f);
-                glow.setColor(Dss.withAlpha(color, 0.30f * (1f - (float) i / rings)));
-                c.drawRect(rect.left - o, rect.top - o, rect.right + o, rect.bottom + o, glow);
-            }
             stroke.setColor(color);
             float h = stroke.getStrokeWidth() / 2f;
             c.drawRect(rect.left + h, rect.top + h, rect.right - h, rect.bottom - h, stroke);

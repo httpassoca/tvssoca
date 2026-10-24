@@ -1,4 +1,4 @@
-# tvhome
+# tvssoca
 
 An Android TV home screen drawn with the [dssoca](https://github.com/httpassoca/dssoca) design system,
 built on the behaviour of the [CleanYourTV](https://github.com/Gathin23/cleanyourtv) launcher.

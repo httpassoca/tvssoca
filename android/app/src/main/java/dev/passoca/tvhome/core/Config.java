@@ -5,12 +5,15 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Launcher configuration. Key names follow the CleanYourTV launcher's config.xml / theme config.json
  * (themes/README.md) so a config written for one reads the same in the other, plus this project's own keys
- * (weather, world_clocks, wallpaper_source).
+ * (weather, world_clocks, wallpaper_source, input_labels). A dock_apps entry may also be a TV input:
+ * {@code "input:<TvInputInfo id>"} puts that HDMI or AV port on the dock as a tile of its own.
  *
  * <p>Same rule as CleanYourTV: every key is optional, a missing, unknown or wrongly typed key keeps the
  * default, and a file that does not parse is ignored as a whole, so a config can never break Home.
@@ -19,6 +22,9 @@ public final class Config {
 
     public static final String ORDER_SHUFFLE = "shuffle";
     public static final String ORDER_SEQUENTIAL = "sequential";
+
+    /** Prefix of a dock_apps entry that names a TV input instead of a package. */
+    public static final String INPUT_PREFIX = "input:";
 
     public List<String> dockApps = List.of();
     public List<String> hiddenApps = List.of();
@@ -39,6 +45,8 @@ public final class Config {
 
     public Weather weather = new Weather(Double.NaN, Double.NaN, "celsius", 30);
     public List<WorldClockEntry> worldClocks = List.of(new WorldClockEntry("Tokyo", "Asia/Tokyo"));
+    /** Tile names for input entries on the dock, keyed by the full "input:..." entry. */
+    public Map<String, String> inputLabels = Map.of();
 
     public static final class WallpaperSource {
         public final String repo, branch, path;
@@ -69,7 +77,7 @@ public final class Config {
         c.dockTitle = dockTitle; c.reducedMotion = reducedMotion; c.wallpaper = wallpaper;
         c.wallpaperRotationMinutes = wallpaperRotationMinutes; c.wallpaperOrder = wallpaperOrder;
         c.wallpaperCaptions = wallpaperCaptions; c.wallpaperDim = wallpaperDim; c.wallpaperSource = wallpaperSource;
-        c.weather = weather; c.worldClocks = worldClocks;
+        c.weather = weather; c.worldClocks = worldClocks; c.inputLabels = inputLabels;
         return c;
     }
 
@@ -117,8 +125,22 @@ public final class Config {
             }
             c.worldClocks = Collections.unmodifiableList(list);
         }
+        JSONObject labels = o.optJSONObject("input_labels");
+        if (labels != null) {
+            Map<String, String> m = new LinkedHashMap<>();
+            for (java.util.Iterator<String> it = labels.keys(); it.hasNext(); ) {
+                String k = it.next();
+                Object v = labels.opt(k);
+                if (k.startsWith(INPUT_PREFIX) && v instanceof String && !((String) v).isEmpty()) m.put(k, (String) v);
+            }
+            c.inputLabels = Collections.unmodifiableMap(m);
+        }
         return c;
     }
+
+    public static boolean isInput(String dockEntry) { return dockEntry.startsWith(INPUT_PREFIX); }
+
+    public static String inputId(String dockEntry) { return dockEntry.substring(INPUT_PREFIX.length()); }
 
     private static boolean bool(JSONObject o, String key, boolean def) {
         Object v = o.opt(key);

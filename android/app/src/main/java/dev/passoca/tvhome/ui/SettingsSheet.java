@@ -199,6 +199,8 @@ final class SettingsSheet extends LinearLayout {
         p.addView(th);
         TextView t = dss.text(12f, dss.fgMuted, dss.body);
         t.setText(host.wallpaperDescription() + " ›");
+        t.setMaxWidth(dss.dp(190));   // a long picture name must not push the row's label out
+        t.setEllipsize(android.text.TextUtils.TruncateAt.MIDDLE);
         t.setPadding(dss.dp(10), 0, 0, 0);
         p.addView(t);
         return p;

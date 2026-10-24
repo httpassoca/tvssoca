@@ -1,8 +1,12 @@
-# tvhome — project brief for Claude
+# tvssoca — project brief for Claude
 
-The owner's own Android TV home screen (launcher). It takes the behaviour and geometry of the
+The owner's own Android TV home screen (launcher), named **tvssoca** on the TV (package and code
+still `dev.passoca.tvhome`). Its icon and banner use the passoca.dev logo (github.com/httpassoca/passoca
+`static/logo.svg`) in signal green. It takes the behaviour and geometry of the
 CleanYourTV launcher (github.com/Gathin23/cleanyourtv, MIT) and redraws it with **dssoca**, her
 design system (github.com/httpassoca/dssoca, npm `dssoca`). Read this file first in every session.
+**`important.md`** (repo root) holds the live state of her TV: what is disabled, how to undo it, the dock and
+the build machine. Keep it current when anything on the TV changes.
 
 ## Goals (what she asked for, in her words where possible)
 
@@ -11,8 +15,13 @@ design system (github.com/httpassoca/dssoca, npm `dssoca`). Read this file first
 2. **Header:** the clock and date, with **weather and world clock built into the time heading** as a
    second line under the date. Plain text, not cards or labels. **No add-on app needed** for either.
    **No greeting** ("Good evening" was removed on purpose).
-3. **Top bar:** Inputs, Wi-Fi and Settings as **icon-only** buttons.
-4. **Dock:** show **only the app title above the dock and the apps**. No "dock 01/04" badge, no
+3. **Top bar:** Inputs, Wi-Fi, Launcher settings (sliders), Settings (gear) and Help as **icon-only** buttons.
+   Help opens a card listing the launcher's keys (hold OK on an app or the gear, Back, Home, reorder, where
+   `config.json` lives). Inputs lists only the TV's physical ports (HDMI in port order, then AV) and its
+   built-in tuner, with a connected / standby badge; apps' channel services (Play Movies, VLC...) are left out.
+4. **Dock:** show **only the app title above the dock and the apps**. Her dock (repo `config.json`):
+   a few apps, and a TV input (a game console on HDMI) as an input tile
+   (`dock_apps` entry `"input:<TvInputInfo id>"`, named through `input_labels`). No "dock 01/04" badge, no
    "last opened" line, no "DOCK" tab. The focus border is plain: **no extra corner marks**.
 5. **Wallpapers from a GitHub folder:** `httpassoca/dotfiles` → `macOS/wallpapers` (branch `main`).
    Download when online, keep a cache, **use the cache when offline**. Pick a wallpaper in the launcher
@@ -68,13 +77,15 @@ licenses/                MIT (CleanYourTV, dssoca), OFL (Electrolize, JetBrains 
 - **Keys:** `HomeActivity.dispatchKeyEvent` routes every key by zone (TILES, TOP, MENU, SHEET), the same
   way the web prototype's focus engine does. Android view focus is not used. OK held for 500 ms is a long
   press: on a tile it opens App info; on Settings it opens the launcher menu (Launcher settings, Reorder apps).
-  The remote's Settings key (`KEYCODE_SETTINGS`) opens the quick panel. Home while on Home resets focus.
+  The remote's Settings key (`KEYCODE_SETTINGS`) opens the quick panel, except on TVs whose system takes
+  that key first (her TCL Google TV does), so Launcher settings also has its own top-bar button.
+  Home while on Home resets focus.
 - **Focus:** the tile zooms to 1.10 (1.12 with advanced effects), overshooting when `focus_overshoot` is on.
-  A square 2 dp accent frame with a soft glow follows on a spring (260/0.58, or 320/0.76 advanced, or
+  A square 2 dp accent frame (border only, **no glow**) follows on a spring (260/0.58, or 320/0.76 advanced, or
   critically damped without overshoot). The ambient glow takes the app's colour, sampled from its banner.
 - **Settings:** defaults ← `config.json` ← choices made on the TV. "Follow config" clears the TV choices.
   `config.json` lives in `/sdcard/Android/data/dev.passoca.tvhome/files/config.json` and uses
-  CleanYourTV's key names plus `weather`, `world_clocks` and `wallpaper_source`, for example:
+  CleanYourTV's key names plus `weather`, `world_clocks`, `wallpaper_source` and `input_labels`, for example:
   ```json
   { "dock_apps": ["com.netflix.ninja", "com.google.android.youtube.tv"],
     "columns": 4,
@@ -92,6 +103,11 @@ licenses/                MIT (CleanYourTV, dssoca), OFL (Electrolize, JetBrains 
   usage.
 - **Weather:** Open-Meteo (`api.open-meteo.com`, no key). It is cached with its fetch time, refreshed
   every `refresh_minutes`, still shown offline, and hidden after 6 hours.
+- **Panels:** menus draw above the settings sheet (elevation 24 vs 16) and are lifted to stay on screen.
+  Leaving Home (onStop) closes every panel and ends reorder, so coming back is always controllable.
+- **Retries:** wallpaper sync every 3 h after a good sync, 10 min after a failed or offline one (checked
+  on each 15 s tick, not only on resume); weather is asked for at most every 10 min while it is due;
+  a picture that fails to decode, or a download that is not an image, is retried later.
 - **Permissions:** INTERNET and ACCESS_NETWORK_STATE, for those two calls only. This differs from stock
   CleanYourTV, which has no internet permission.
 
@@ -99,7 +115,7 @@ licenses/                MIT (CleanYourTV, dssoca), OFL (Electrolize, JetBrains 
 
 ```bash
 cd android
-./gradlew testDebugUnitTest            # 43 JVM tests for core/
+./gradlew testDebugUnitTest            # 45 JVM tests for core/
 ./gradlew lintDebug                    # 0 errors expected
 ./gradlew assembleDebug                # app/build/outputs/apk/debug/app-debug.apk
 ./gradlew assembleRelease              # minified, signed with this machine's debug key (personal build)
@@ -117,33 +133,47 @@ Requirements: JDK 17+ and Android SDK platform 35 with build-tools 35. Set `sdk.
 `android/local.properties`. AGP 8.7.3 and the Gradle 8.14.3 wrapper are included.
 Do **not** disable the stock launcher until this one has been tried on the TV.
 
+**Her TV (TCL C655, Google TV, Android 12):** `set-home-activity` and `cmd role add-role-holder
+android.app.role.HOME dev.passoca.tvhome` are accepted, but Google TV's launcherx declares its HOME filter
+at system priority 2, so the Home key still opens it. **Done on 2026-10-24:** tvssoca is Home after
+```bash
+adb shell pm disable-user --user 0 com.google.android.apps.tv.launcherx      # Google TV home
+adb shell pm disable-user --user 0 com.google.android.tungsten.setupwraith   # its HOME RecoveryActivity (priority 1) shows a black screen otherwise
+```
+Undo (restores Google TV home): `adb shell pm enable com.google.android.tungsten.setupwraith` and
+`adb shell pm enable com.google.android.apps.tv.launcherx`. The remote's Home key needs no change: it sends
+the HOME intent, which now only tvssoca answers. A TCL OTA or a factory reset may re-enable both.
+The remote's Settings key is still taken by the system.
+
 ## Keeping web and Android in step
 
 - A behaviour change goes into `core/` first, with a test, and then into `web/index.html`'s matching section.
 - Colours, type and spacing come only from dssoca tokens (`--ss-*` on the web, `res/values/colors.xml`
   and `ui/Dss` on Android). On Android the tokens are resolved hex values of dssoca's dark theme.
   Recompute them if dssoca changes: elevation mixes are done in OKLab, as CSS `color-mix(in oklab, …)` does.
-- Never reintroduce: the greeting, dock labels or badges, corner brackets on the focus frame,
+- Never reintroduce: the greeting, dock labels or badges, corner brackets or a glow on the focus frame,
   boxed weather/clock cards, labelled top buttons, the light theme, or other sizes.
 
 ## Status (2026-10-24)
 
 Verified in the build sandbox:
-- 43 unit tests pass (config parsing, layout geometry, spring, focus model, wallpaper rotation and
+- 45 unit tests pass (config parsing, layout geometry, spring, focus model, wallpaper rotation and
   sync plan, Open-Meteo parsing and cache ageing, world clock across a DST change).
 - `assembleDebug`, `assembleRelease` and `lintDebug` succeed: 0 errors, 31 warnings. Most warnings are
   dssoca size tokens in `dimens.xml` that the code does not reference yet (it uses dp literals that
   match them), plus ViewConstructor on code-only views.
 
+**Verified on her TV (2026-10-24):** header, dock and grid, input tile, Inputs menu, Help card, Launcher
+settings and the wallpaper picker over it, wallpaper sync from GitHub, panels closed after leaving Home.
+Idle on Home: 1 frame in 20 s, about 0% CPU.
+
 **Not yet verified:**
-- The Android app has **not been run on a TV or emulator**. The first job on a real device is a visual
-  pass against `web/index.html`: header spacing, menu placement under the icons, settings sheet height,
-  banner cropping, glow strength.
+- Long press OK with the real IR remote (adb's `--longpress` releases at 400 ms, before the 500 ms timer).
 - The web page's wallpapers are a fixed snapshot. Only the Android build syncs from GitHub.
 
 ### Next steps, in order
 
-1. Install on the TV, compare with the web page, fix spacing.
+1. Check long press OK with the real IR remote now that tvssoca is Home.
 2. Set the weather coordinates in `config.json`.
 3. Idle lock screen.
 4. Web remote.

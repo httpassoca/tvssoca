@@ -44,6 +44,11 @@ final class Net {
     static void download(String url, File dest, long maxBytes) throws IOException {
         File part = new File(dest.getPath() + ".part");
         HttpURLConnection c = open(url);
+        String type = c.getContentType();
+        if (type != null && !type.startsWith("image/") && !type.startsWith("application/octet-stream")) {
+            c.disconnect();
+            throw new IOException("not a picture (" + type + "): " + dest.getName());
+        }
         try (InputStream in = c.getInputStream(); OutputStream out = new FileOutputStream(part)) {
             copy(in, out, maxBytes);
         } finally {

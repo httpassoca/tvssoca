@@ -1,11 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">TV Home</string>
+    <string name="app_name">tvssoca</string>
     <string name="inputs">Inputs</string>
     <string name="wifi">Wi-Fi</string>
     <string name="settings">Settings</string>
     <string name="live_tv">Live TV</string>
     <string name="connected">connected</string>
+    <string name="standby">standby</string>
     <string name="tv_settings">TV system settings</string>
     <string name="display">Display</string>
     <string name="network">Network</string>
@@ -43,4 +44,22 @@
     <string name="synced">Wallpapers synced: %1$d new, %2$d removed</string>
     <string name="cant_open">Can\'t open %1$s</string>
     <string name="no_inputs">No inputs on this TV</string>
+    <string name="help">Help</string>
+    <string name="help_title">Using the launcher</string>
+    <string name="help_k_move">← ↑ → ↓</string>
+    <string name="help_move">Move between apps. Up from the dock reaches the top buttons</string>
+    <string name="help_k_ok">OK</string>
+    <string name="help_ok">Open the app, input or button. The sliders button opens Launcher settings</string>
+    <string name="help_k_hold_app">Hold OK · app</string>
+    <string name="help_hold_app">App info: force stop, storage, disable</string>
+    <string name="help_k_hold_gear">Hold OK · gear</string>
+    <string name="help_hold_gear">Launcher menu: Launcher settings and Reorder apps</string>
+    <string name="help_k_back">Back</string>
+    <string name="help_back">From the grid, return to the dock. Closes menus</string>
+    <string name="help_k_home">Home</string>
+    <string name="help_home">Return to the first app with everything closed</string>
+    <string name="help_k_reorder">Reorder</string>
+    <string name="help_reorder">OK picks up an app, arrows move it, Back places it, Back again saves</string>
+    <string name="help_k_config">config.json</string>
+    <string name="help_config">Android/data/dev.passoca.tvhome/files/config.json. Follow config in Launcher settings drops the choices made on the TV</string>
 </resources>

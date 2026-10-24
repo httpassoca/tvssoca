@@ -60,8 +60,8 @@ import dev.passoca.tvhome.data.WeatherRepository;
  */
 public final class HomeActivity extends Activity implements SettingsSheet.Host {
 
-    private static final int TOP_INPUTS = 0, TOP_WIFI = 1, TOP_SETTINGS = 2, TOP_COUNT = 3;
-    private static final long LONG_PRESS_MS = 500, TICK_MS = 15_000, SYNC_EVERY_MS = 3 * 3_600_000L;
+    private static final int TOP_INPUTS = 0, TOP_WIFI = 1, TOP_LAUNCHER = 2, TOP_SETTINGS = 3, TOP_HELP = 4, TOP_COUNT = 5;
+    private static final long LONG_PRESS_MS = 500, TICK_MS = 15_000, SYNC_EVERY_MS = 3 * 3_600_000L, RETRY_MS = 10 * 60_000L;
 
     private Dss dss;
     private Prefs prefs;
@@ -81,6 +81,7 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
     private final Views.IconButton[] top = new Views.IconButton[TOP_COUNT];
     private MenuPanel menu;
     private SettingsSheet sheet;
+    private HelpCard help;
     private View toast;
 
     private final Handler main = new Handler(Looper.getMainLooper());
@@ -94,7 +95,8 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
     private long wallSince;
     private String wallShown;
     private boolean wallFront = true;
-    private long lastSync;
+    /** Next wallpaper sync and weather attempt: 3 h after a good sync, 10 min after a failed or offline one. */
+    private long nextSyncAt, nextWeatherAt;
     private final Random random = new Random();
 
     private boolean glowFront = true, launching;
@@ -118,7 +120,9 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
         wallFiles = walls.files();
         wallIndex = prefs.wallIndex() >= 0 ? prefs.wallIndex() : WallpaperRotation.next(-1, wallFiles.size(), cfg.wallpaperOrder, random);
         wallSince = prefs.wallSince() > 0 ? prefs.wallSince() : System.currentTimeMillis();
+        if (prefs.wallIndex() < 0) prefs.setWall(wallIndex, wallSince);   // keep the first pick across restarts
         loadApps();
+        showWallpaper();   // queued before the picker thumbnails so Home is not bare while they decode
         loadThumbs();
         IntentFilter f = new IntentFilter();
         f.addAction(Intent.ACTION_PACKAGE_ADDED);
@@ -141,13 +145,23 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
         tick();
         main.removeCallbacks(ticker);
         main.postDelayed(ticker, TICK_MS);
-        if (System.currentTimeMillis() - lastSync > SYNC_EVERY_MS) syncWallpapers();
+        syncWallpapersIfDue();
         refreshWeather();
     }
 
     @Override protected void onPause() {
         super.onPause();
         main.removeCallbacks(ticker);
+    }
+
+    /** Leaving Home (an app, the stock launcher, the TV's settings): come back with nothing open. */
+    @Override protected void onStop() {
+        super.onStop();
+        if (menu == null && sheet == null && help == null && !model.reorder) return;
+        closeOverlays();
+        if (model.reorder) endReorder(false);
+        model.focusTile(model.zone == HomeModel.Zone.TILES ? model.tile : model.dockReturn);
+        render(false);
     }
 
     @Override protected void onDestroy() {
@@ -297,7 +311,7 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
         LinearLayout dateCol = new LinearLayout(this);
         dateCol.setOrientation(LinearLayout.VERTICAL);
         date = dss.caps(12f, dss.fgMuted, 0.14f);
-        dateCol.addView(date);
+        dateCol.addView(date, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         info = new LinearLayout(this);
         info.setGravity(Gravity.CENTER_VERTICAL);
         LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -312,8 +326,8 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
         right.setOrientation(LinearLayout.VERTICAL);
         right.setGravity(Gravity.END);
         LinearLayout buttons = new LinearLayout(this);
-        int[] icons = {R.drawable.ic_input, R.drawable.ic_wifi, R.drawable.ic_settings};
-        int[] labels = {R.string.inputs, R.string.wifi, R.string.settings};
+        int[] icons = {R.drawable.ic_input, R.drawable.ic_wifi, R.drawable.ic_tune, R.drawable.ic_settings, R.drawable.ic_help};
+        int[] labels = {R.string.inputs, R.string.wifi, R.string.launcher_settings, R.string.settings, R.string.help};
         for (int i = 0; i < TOP_COUNT; i++) {
             top[i] = new Views.IconButton(dss, icons[i], getString(labels[i]));
             LinearLayout.LayoutParams bp = new LinearLayout.LayoutParams(dss.dp(38), dss.dp(38));
@@ -335,7 +349,7 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
 
     private void loadApps() {
         io.execute(() -> {
-            List<AppsRepository.App> list = AppsRepository.load(this, cfg.hiddenApps);
+            List<AppsRepository.App> list = AppsRepository.load(this, cfg);
             main.post(() -> {
                 apps.clear();
                 List<String> installed = new ArrayList<>();
@@ -346,7 +360,9 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
                 model.order.addAll(order);
                 int idx = keep == null ? 0 : Math.max(0, order.indexOf(keep));
                 buildTiles(true);
+                HomeModel.Zone zone = model.zone;
                 model.focusTile(idx);
+                model.zone = zone;   // an app installed while a panel is open must not pull focus out of it
                 render(false);
             });
         });
@@ -412,6 +428,7 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
         for (int i = 0; i < TOP_COUNT; i++) {
             boolean open = menu != null && menu.back != HomeModel.Zone.SHEET
                     && (("inputs".equals(menu.kind) && i == TOP_INPUTS) || (!"inputs".equals(menu.kind) && i == TOP_SETTINGS));
+            open |= (help != null && i == TOP_HELP) || (sheet != null && i == TOP_LAUNCHER);
             top[i].setFocused((model.zone == HomeModel.Zone.TOP && model.top == i) || open, model.reorder && i == TOP_SETTINGS);
         }
 
@@ -511,7 +528,9 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
                 && WallpaperRotation.due(System.currentTimeMillis(), wallSince, cfg.wallpaperRotationMinutes)) {
             nextWallpaper();
         }
-        if (weather != null && cfg.weather.isSet() && weather.shouldRefresh(System.currentTimeMillis(), cfg.weather.refreshMinutes)) refreshWeather();
+        if (cfg.weather.isSet() && System.currentTimeMillis() >= nextWeatherAt
+                && (weather == null || weather.shouldRefresh(System.currentTimeMillis(), cfg.weather.refreshMinutes))) refreshWeather();
+        syncWallpapersIfDue();
     }
 
     private void renderInfo() {
@@ -551,8 +570,10 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
         return v;
     }
 
+    /** Asks the repository at most every 10 min; it calls Open-Meteo only when the reading is due. */
     private void refreshWeather() {
         if (!cfg.weather.isSet()) return;
+        nextWeatherAt = System.currentTimeMillis() + RETRY_MS;
         io.execute(() -> {
             WeatherReading r = weatherRepo.refresh(cfg.weather, System.currentTimeMillis());
             main.post(() -> { weather = r; renderInfo(); });
@@ -561,11 +582,13 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
 
     // ─── wallpapers ─────────────────────────────────────────────────────────
 
-    private void syncWallpapers() {
-        lastSync = System.currentTimeMillis();
+    private void syncWallpapersIfDue() {
+        if (System.currentTimeMillis() < nextSyncAt) return;
+        nextSyncAt = System.currentTimeMillis() + RETRY_MS;   // one sync at a time
         io.execute(() -> {
             WallpaperRepository.Result r = walls.sync(cfg.wallpaperSource);
             main.post(() -> {
+                nextSyncAt = System.currentTimeMillis() + (r.ok ? SYNC_EVERY_MS : RETRY_MS);
                 wallFiles = walls.files();
                 if (r.ok && (r.added > 0 || r.removed > 0)) {
                     loadThumbs();
@@ -584,7 +607,12 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
                 Bitmap b = walls.decode(f, 96, 54);
                 if (b != null) out.put(f, new BitmapDrawable(getResources(), b));
             }
-            main.post(() -> { wallThumbs.clear(); wallThumbs.putAll(out); showWallpaper(); });
+            main.post(() -> {
+                wallThumbs.clear();
+                wallThumbs.putAll(out);
+                showWallpaper();
+                if (sheet != null) sheet.refresh();   // the Picture row's thumbnail
+            });
         });
     }
 
@@ -612,7 +640,8 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
         io.execute(() -> {
             Bitmap b = walls.decode(file, w, h);
             main.post(() -> {
-                if (b == null || !file.equals(wallShown)) return;
+                if (!file.equals(wallShown)) return;
+                if (b == null) { wallShown = null; return; }   // unreadable file: try again on the next change
                 ImageView in = wallFront ? wallB : wallA, out = wallFront ? wallA : wallB;
                 in.setImageBitmap(b);
                 in.animate().alpha(1f).setDuration(motion() ? 650 : 0).start();
@@ -690,6 +719,8 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
             case SHEET:
                 sheet.onKey(code);
                 return;
+            case HELP:
+                return;
             case TOP:
                 if (model.moveTop(dir(code))) render(true);
                 return;
@@ -706,9 +737,12 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
         switch (model.zone) {
             case MENU: menu.activate(); return;
             case SHEET: sheet.activate(); return;
+            case HELP: closeHelp(); return;
             case TOP:
                 if (model.top == TOP_INPUTS) openInputs();
                 else if (model.top == TOP_WIFI) open(new Intent(Settings.ACTION_WIFI_SETTINGS), getString(R.string.wifi));
+                else if (model.top == TOP_HELP) openHelp();
+                else if (model.top == TOP_LAUNCHER) openSheet();
                 else if (longPress) launcherMenu();
                 else open(new Intent(Settings.ACTION_SETTINGS), getString(R.string.settings));
                 return;
@@ -720,7 +754,7 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
                     render(true);
                     return;
                 }
-                if (longPress) {
+                if (longPress && !pkg.startsWith(Config.INPUT_PREFIX)) {
                     open(new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:" + pkg)), pkg);
                     return;
                 }
@@ -733,6 +767,7 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
         switch (model.zone) {
             case MENU: closeMenu(); return;
             case SHEET: closeSheet(); return;
+            case HELP: closeHelp(); return;
             default:
                 if (model.reorder) {
                     if (model.picked) { model.picked = false; render(true); }
@@ -777,7 +812,8 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
             if (in.tuner && !tunerSep && !items.isEmpty()) { items.add(MenuPanel.Item.separator()); tunerSep = true; }
             int icon = in.tuner ? R.drawable.ic_livetv : in.hdmi ? R.drawable.ic_input : R.drawable.ic_av;
             Runnable act = () -> { closeMenu(); launch(in.intent(), in.label); };
-            items.add(in.connected ? MenuPanel.Item.badged(in.label, icon, getString(R.string.connected), true, act)
+            items.add(Boolean.TRUE.equals(in.connected) ? MenuPanel.Item.badged(in.label, icon, getString(R.string.connected), true, act)
+                    : in.connected == null ? MenuPanel.Item.badged(in.label, icon, getString(R.string.standby), false, act)
                     : MenuPanel.Item.action(in.label, icon, act));
         }
         if (items.isEmpty()) { toast(getString(R.string.no_inputs), false); return; }
@@ -840,12 +876,18 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
         if (menu != null) overlay.removeView(menu);
         menu = m;
         float[] r = stageRect(anchor);
-        m.measure(View.MeasureSpec.UNSPECIFIED, View.MeasureSpec.UNSPECIFIED);
-        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        lp.gravity = Gravity.TOP | Gravity.START;
-        lp.leftMargin = Math.max(dss.dp(16), Math.round(r[2] - m.getMeasuredWidth()));
-        lp.topMargin = Math.round(r[3] + dss.dpf(8));
+        // web: .tv-menu .panel{min-width:240px;max-width:380px}
+        m.measure(View.MeasureSpec.makeMeasureSpec(dss.dp(380), View.MeasureSpec.AT_MOST), View.MeasureSpec.UNSPECIFIED);
+        int width = Math.max(dss.dp(240), Math.min(dss.dp(380), m.getMeasuredWidth()));
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(width, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.gravity = Gravity.TOP | Gravity.END;
+        lp.rightMargin = Math.max(0, Math.round(dss.dpf(Layout.STAGE_W) - r[2]));
+        lp.leftMargin = dss.dp(16);
+        // drop under the anchor, lifted when it would run off the bottom of the screen
+        int maxTop = Math.round(dss.dpf(Layout.STAGE_H - 16)) - m.getMeasuredHeight();
+        lp.topMargin = Math.max(dss.dp(16), Math.min(Math.round(r[3] + dss.dpf(8)), maxTop));
         overlay.addView(m, lp);
+        m.bringToFront();
         if (motion()) { m.setAlpha(0f); m.setTranslationY(-dss.dpf(6)); m.animate().alpha(1f).translationY(0f).setDuration(250).start(); }
         model.zone = HomeModel.Zone.MENU;
         render(true);
@@ -881,8 +923,31 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
     private void closeOverlays() {
         if (menu != null) overlay.removeView(menu);
         if (sheet != null) overlay.removeView(sheet);
+        if (help != null) overlay.removeView(help);
         menu = null;
         sheet = null;
+        help = null;
+    }
+
+    /** The Help button's card, dropped under the top bar with its right edge on the button's. */
+    private void openHelp() {
+        help = new HelpCard(dss);
+        float[] r = stageRect(top[TOP_HELP]);
+        FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(dss.dp(560), ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.gravity = Gravity.TOP | Gravity.END;
+        lp.rightMargin = Math.max(0, Math.round(dss.dpf(Layout.STAGE_W) - r[2]));
+        lp.topMargin = Math.round(r[3] + dss.dpf(8));
+        overlay.addView(help, lp);
+        if (motion()) { help.setAlpha(0f); help.setTranslationY(-dss.dpf(6)); help.animate().alpha(1f).translationY(0f).setDuration(250).start(); }
+        model.zone = HomeModel.Zone.HELP;
+        render(true);
+    }
+
+    private void closeHelp() {
+        if (help != null) overlay.removeView(help);
+        help = null;
+        model.zone = HomeModel.Zone.TOP;
+        render(true);
     }
 
     /** dssoca Toast: elevated square card, 3 dp left border (accent for success), glyph and message. */

@@ -87,4 +87,14 @@ public class HomeModelTest {
         assertEquals(List.of("c", "a", "b", "d"), HomeModel.arrange(installed, List.of(), List.of("c", "x", "a")));
         assertEquals(List.of("d", "b", "a", "c"), HomeModel.arrange(installed, List.of("d", "gone", "b"), List.of("c")));
     }
+
+    @Test public void changingColumnsFromTheSheetKeepsFocusInTheSheet() {
+        HomeModel m = model(12);
+        m.focusTile(5);
+        m.move(HomeModel.Dir.UP); m.move(HomeModel.Dir.UP);   // to the top bar
+        m.zone = HomeModel.Zone.SHEET;
+        m.setColumns(6);
+        assertEquals(HomeModel.Zone.SHEET, m.zone);
+        assertTrue(m.dockReturn < 6);
+    }
 }

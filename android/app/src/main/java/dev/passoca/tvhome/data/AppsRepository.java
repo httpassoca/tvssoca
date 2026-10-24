@@ -17,6 +17,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
+import dev.passoca.tvhome.R;
+import dev.passoca.tvhome.core.Config;
+
 /** Installed apps Home can open: every leanback launcher entry, then phone-style launcher entries. */
 public final class AppsRepository {
 
@@ -32,17 +35,28 @@ public final class AppsRepository {
         }
 
         public Intent launchIntent() { return new Intent(launch); }
+
+        /** A TV input placed on the dock (dock_apps "input:..."), not an installed package. */
+        public boolean isInput() { return Config.isInput(pkg); }
     }
 
     private AppsRepository() {}
 
-    public static List<App> load(Context ctx, List<String> hidden) {
+    /** Installed apps by label, plus a tile for every {@code input:} entry of the dock that the TV has. */
+    public static List<App> load(Context ctx, Config cfg) {
         PackageManager pm = ctx.getPackageManager();
         Map<String, App> apps = new LinkedHashMap<>();
-        collect(ctx, pm, Intent.CATEGORY_LEANBACK_LAUNCHER, hidden, apps);
-        collect(ctx, pm, Intent.CATEGORY_LAUNCHER, hidden, apps);
+        collect(ctx, pm, Intent.CATEGORY_LEANBACK_LAUNCHER, cfg.hiddenApps, apps);
+        collect(ctx, pm, Intent.CATEGORY_LAUNCHER, cfg.hiddenApps, apps);
         List<App> out = new ArrayList<>(apps.values());
         out.sort(Comparator.comparing(a -> a.label.toLowerCase(Locale.ROOT)));
+        for (String entry : cfg.dockApps) {
+            if (!Config.isInput(entry)) continue;
+            InputsRepository.Input in = InputsRepository.find(ctx, Config.inputId(entry));
+            if (in == null) continue;
+            String label = cfg.inputLabels.containsKey(entry) ? cfg.inputLabels.get(entry) : in.label;
+            out.add(new App(entry, label, null, ctx.getDrawable(R.drawable.ic_input), ctx.getColor(R.color.ss_primary), in.intent()));
+        }
         return out;
     }
 

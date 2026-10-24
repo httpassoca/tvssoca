@@ -9,7 +9,7 @@ import java.util.List;
  */
 public final class HomeModel {
 
-    public enum Zone { TILES, TOP, MENU, SHEET }
+    public enum Zone { TILES, TOP, MENU, SHEET, HELP }
     public enum Dir { UP, DOWN, LEFT, RIGHT }
 
     public final List<String> order = new ArrayList<>();
@@ -81,9 +81,12 @@ public final class HomeModel {
         }
     }
 
+    /** New row width: the focused tile and scroll follow, but focus stays in its zone (the sheet that changed it). */
     public void setColumns(int columns) {
         this.columns = columns;
-        focusTile(tile);
+        tile = Math.max(0, Math.min(tile, order.size() - 1));
+        scroll = Layout.scrollFor(Layout.cell(tile, columns), scroll);
+        dockReturn = Math.min(dockReturn, Math.max(0, Math.min(columns, order.size()) - 1));
     }
 
     /** Back on a grid row jumps to the dock tile in the same column. */
