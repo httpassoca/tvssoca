@@ -85,7 +85,8 @@ licenses/                MIT (CleanYourTV, dssoca), OFL (Electrolize, JetBrains 
   critically damped without overshoot). The ambient glow takes the app's colour, sampled from its banner.
 - **Settings:** defaults ← `config.json` ← choices made on the TV. "Follow config" clears the TV choices.
   `config.json` lives in `/sdcard/Android/data/dev.passoca.tvhome/files/config.json` and uses
-  CleanYourTV's key names plus `weather`, `world_clocks`, `wallpaper_source` and `input_labels`, for example:
+  CleanYourTV's key names plus `weather`, `world_clocks`, `wallpaper_source`, `input_labels` and
+  `removed_apps` (listed at the end of the Help card), for example:
   ```json
   { "dock_apps": ["com.netflix.ninja", "com.google.android.youtube.tv"],
     "columns": 4,
@@ -115,7 +116,7 @@ licenses/                MIT (CleanYourTV, dssoca), OFL (Electrolize, JetBrains 
 
 ```bash
 cd android
-./gradlew testDebugUnitTest            # 45 JVM tests for core/
+./gradlew testDebugUnitTest            # 46 JVM tests for core/
 ./gradlew lintDebug                    # 0 errors expected
 ./gradlew assembleDebug                # app/build/outputs/apk/debug/app-debug.apk
 ./gradlew assembleRelease              # minified, signed with this machine's debug key (personal build)
@@ -157,7 +158,7 @@ The remote's Settings key is still taken by the system.
 ## Status (2026-10-24)
 
 Verified in the build sandbox:
-- 45 unit tests pass (config parsing, layout geometry, spring, focus model, wallpaper rotation and
+- 46 unit tests pass (config parsing, layout geometry, spring, focus model, wallpaper rotation and
   sync plan, Open-Meteo parsing and cache ageing, world clock across a DST change).
 - `assembleDebug`, `assembleRelease` and `lintDebug` succeed: 0 errors, 31 warnings. Most warnings are
   dssoca size tokens in `dimens.xml` that the code does not reference yet (it uses dp literals that

@@ -720,6 +720,8 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
                 sheet.onKey(code);
                 return;
             case HELP:
+                if (code == KeyEvent.KEYCODE_DPAD_DOWN) help.scrollBy(1);
+                else if (code == KeyEvent.KEYCODE_DPAD_UP) help.scrollBy(-1);
                 return;
             case TOP:
                 if (model.moveTop(dir(code))) render(true);
@@ -931,7 +933,7 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
 
     /** The Help button's card, dropped under the top bar with its right edge on the button's. */
     private void openHelp() {
-        help = new HelpCard(dss);
+        help = new HelpCard(dss, cfg);
         float[] r = stageRect(top[TOP_HELP]);
         FrameLayout.LayoutParams lp = new FrameLayout.LayoutParams(dss.dp(560), ViewGroup.LayoutParams.WRAP_CONTENT);
         lp.gravity = Gravity.TOP | Gravity.END;

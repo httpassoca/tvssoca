@@ -71,4 +71,13 @@ public class ConfigTest {
         assertEquals("Switch 2", c.inputLabels.get(hdmi));
         assertEquals("only input: keys with text values", 1, c.inputLabels.size());
     }
+
+    @Test public void removedAppsAreListed() {
+        Config c = Config.parse("{\"removed_apps\":[{\"label\":\"Disney+\",\"pkg\":\"com.disney.disneyplus\"},"
+                + "{\"label\":\"Play Games\",\"pkg\":\"com.google.android.play.games\",\"system\":true},{\"label\":\"\"},3]}");
+        assertEquals(2, c.removedApps.size());
+        assertFalse(c.removedApps.get(0).system);
+        assertTrue(c.removedApps.get(1).system);
+        assertTrue(Config.parse(null).removedApps.isEmpty());
+    }
 }

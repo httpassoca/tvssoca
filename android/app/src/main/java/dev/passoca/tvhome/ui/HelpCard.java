@@ -4,13 +4,18 @@ import android.annotation.SuppressLint;
 import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
+import android.widget.ScrollView;
 import android.widget.TextView;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import dev.passoca.tvhome.R;
+import dev.passoca.tvhome.core.Config;
 
 /**
  * The Help button's card: a dssoca Card listing the launcher's keys, each as a Kbd chip with its meaning.
- * Read-only; OK or Back closes it.
+ * Ends with the apps removed from the TV (config.json removed_apps). Up and down scroll; OK or Back closes it.
  */
 @SuppressLint("ViewConstructor")
 final class HelpCard extends LinearLayout {
@@ -26,8 +31,12 @@ final class HelpCard extends LinearLayout {
             {R.string.help_k_config, R.string.help_config},
     };
 
-    HelpCard(Dss dss) {
+    private final Dss dss;
+    private final ScrollView scroll;
+
+    HelpCard(Dss dss, Config cfg) {
         super(dss.ctx);
+        this.dss = dss;
         setOrientation(VERTICAL);
         setBackground(dss.box(dss.bgElev, dss.line));
         setElevation(dss.dpf(16));
@@ -50,24 +59,53 @@ final class HelpCard extends LinearLayout {
         LinearLayout body = new LinearLayout(dss.ctx);
         body.setOrientation(VERTICAL);
         body.setPadding(dss.dp(18), dss.dp(10), dss.dp(18), dss.dp(14));
-        for (int[] r : ROWS) {
-            LinearLayout line = new LinearLayout(dss.ctx);
-            line.setGravity(Gravity.CENTER_VERTICAL);
-            line.setPadding(0, dss.dp(5), 0, dss.dp(5));
-            // dssoca Kbd: square key chip, 1 dp strong line, mono
+        for (int[] r : ROWS) body.addView(row(dss.ctx.getString(r[0]), dss.ctx.getString(r[1])));
+
+        if (!cfg.removedApps.isEmpty()) {
+            TextView group = dss.caps(10f, dss.fgFaint, 0.14f);
+            group.setText(R.string.help_removed);
+            group.setPadding(0, dss.dp(14), 0, dss.dp(4));
+            body.addView(group);
+            List<String> play = new ArrayList<>(), system = new ArrayList<>();
+            for (Config.RemovedApp a : cfg.removedApps) (a.system ? system : play).add(a.label);
+            if (!play.isEmpty()) body.addView(row(dss.ctx.getString(R.string.help_k_play), String.join(" · ", play)));
+            if (!system.isEmpty()) {
+                body.addView(row(dss.ctx.getString(R.string.help_k_system), String.join(" · ", system)));
+                body.addView(row("", dss.ctx.getString(R.string.help_system_how)));
+            }
+        }
+        scroll = new ScrollView(dss.ctx);
+        scroll.setVerticalScrollBarEnabled(false);
+        scroll.addView(body);
+        addView(scroll, new LayoutParams(LayoutParams.MATCH_PARENT, 0, 1f));
+    }
+
+    /** One line: a dssoca Kbd chip (square, 1 dp strong line, mono) and what it does. */
+    private LinearLayout row(String keyText, String whatText) {
+        LinearLayout line = new LinearLayout(dss.ctx);
+        line.setGravity(Gravity.CENTER_VERTICAL);
+        line.setPadding(0, dss.dp(5), 0, dss.dp(5));
+        LinearLayout keyCol = new LinearLayout(dss.ctx);
+        if (!keyText.isEmpty()) {
             TextView key = dss.text(11f, dss.fg, dss.bodyMedium);
-            key.setText(r[0]);
+            key.setText(keyText);
             key.setPadding(dss.dp(7), dss.dp(3), dss.dp(7), dss.dp(3));
             key.setBackground(dss.box(dss.bg, dss.lineStrong));
-            LinearLayout keyCol = new LinearLayout(dss.ctx);
             keyCol.addView(key);
-            line.addView(keyCol, new LayoutParams(dss.dp(130), LayoutParams.WRAP_CONTENT));
-            TextView what = dss.text(12f, dss.fgMuted, dss.body);
-            what.setSingleLine(false);
-            what.setText(r[1]);
-            line.addView(what, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
-            body.addView(line);
         }
-        addView(body);
+        line.addView(keyCol, new LayoutParams(dss.dp(130), LayoutParams.WRAP_CONTENT));
+        TextView what = dss.text(12f, dss.fgMuted, dss.body);
+        what.setSingleLine(false);
+        what.setText(whatText);
+        line.addView(what, new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1f));
+        return line;
+    }
+
+    /** D-pad up / down: scroll the card a few lines. */
+    void scrollBy(int direction) { scroll.smoothScrollBy(0, direction * dss.dp(72)); }
+
+    /** Never taller than the screen below the top bar. */
+    @Override protected void onMeasure(int w, int h) {
+        super.onMeasure(w, MeasureSpec.makeMeasureSpec(dss.dp(440), MeasureSpec.AT_MOST));
     }
 }

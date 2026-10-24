@@ -47,6 +47,8 @@ public final class Config {
     public List<WorldClockEntry> worldClocks = List.of(new WorldClockEntry("Tokyo", "Asia/Tokyo"));
     /** Tile names for input entries on the dock, keyed by the full "input:..." entry. */
     public Map<String, String> inputLabels = Map.of();
+    /** Apps taken off the TV, listed at the end of the Help card so they can be put back. */
+    public List<RemovedApp> removedApps = List.of();
 
     public static final class WallpaperSource {
         public final String repo, branch, path;
@@ -70,6 +72,13 @@ public final class Config {
         public WorldClockEntry(String label, String zone) { this.label = label; this.zone = zone; }
     }
 
+    /** {@code system}: came with the TV, restore with {@code cmd package install-existing}; otherwise from Play. */
+    public static final class RemovedApp {
+        public final String label, pkg;
+        public final boolean system;
+        public RemovedApp(String label, String pkg, boolean system) { this.label = label; this.pkg = pkg; this.system = system; }
+    }
+
     public Config copy() {
         Config c = new Config();
         c.dockApps = dockApps; c.hiddenApps = hiddenApps; c.columns = columns; c.animations = animations;
@@ -77,7 +86,7 @@ public final class Config {
         c.dockTitle = dockTitle; c.reducedMotion = reducedMotion; c.wallpaper = wallpaper;
         c.wallpaperRotationMinutes = wallpaperRotationMinutes; c.wallpaperOrder = wallpaperOrder;
         c.wallpaperCaptions = wallpaperCaptions; c.wallpaperDim = wallpaperDim; c.wallpaperSource = wallpaperSource;
-        c.weather = weather; c.worldClocks = worldClocks; c.inputLabels = inputLabels;
+        c.weather = weather; c.worldClocks = worldClocks; c.inputLabels = inputLabels; c.removedApps = removedApps;
         return c;
     }
 
@@ -134,6 +143,17 @@ public final class Config {
                 if (k.startsWith(INPUT_PREFIX) && v instanceof String && !((String) v).isEmpty()) m.put(k, (String) v);
             }
             c.inputLabels = Collections.unmodifiableMap(m);
+        }
+        JSONArray removed = o.optJSONArray("removed_apps");
+        if (removed != null) {
+            List<RemovedApp> list = new ArrayList<>();
+            for (int i = 0; i < removed.length(); i++) {
+                JSONObject e = removed.optJSONObject(i);
+                if (e == null) continue;
+                String label = e.optString("label", ""), pkg = e.optString("pkg", "");
+                if (!label.isEmpty() && !pkg.isEmpty()) list.add(new RemovedApp(label, pkg, e.optBoolean("system", false)));
+            }
+            c.removedApps = Collections.unmodifiableList(list);
         }
         return c;
     }

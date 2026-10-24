@@ -113,7 +113,7 @@ body{margin:0;background:var(--ss-bg);color:var(--ss-fg);font-family:var(--ss-fo
 .tv-sheet .srcline span:first-of-type{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .tv-sheet .pickv{display:flex;align-items:center;gap:10px;color:var(--ss-fg-muted);font-size:var(--ss-ui-sm)}
 .tv-sheet .pickv .thumb{width:48px;height:27px;background-size:cover;background-position:center;box-shadow:0 0 0 1px var(--ss-line)}
-.tv-help{position:absolute;width:560px;z-index:10;box-shadow:var(--ss-shadow-pop);animation:tv-fade var(--ss-dur) var(--ss-ease) both}
+.tv-help{position:absolute;width:560px;max-height:440px;overflow-y:auto;z-index:10;box-shadow:var(--ss-shadow-pop);animation:tv-fade var(--ss-dur) var(--ss-ease) both}
 .tv-help .rows{display:grid;grid-template-columns:130px minmax(0,1fr);gap:10px 0;align-items:center;font-size:var(--ss-ui-sm);color:var(--ss-fg-muted)}
 .tv-help .rows .ss-kbd{justify-self:start}
 .tv-menu .cap{padding:6px 16px 8px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ss-fg-faint)}
@@ -231,7 +231,9 @@ const CONFIG = {
   dock_apps: ["flick","tide","loop","star","hdmi2"],   // "hdmi2" stands for an "input:<id>" entry
   // header line under the date, computed by the launcher itself (no add-on app needed)
   weather: {latitude: null, longitude: null, units: "celsius", refresh_minutes: 30},  // Open-Meteo, no API key
-  world_clocks: [{label: "Tokyo", tz: "Asia/Tokyo"}],                                 // IANA zones, offline, DST-aware
+  world_clocks: [{label: "Tokyo", tz: "Asia/Tokyo"}],
+  // apps taken off the TV, listed at the end of the Help card (system: restore with install-existing)
+  removed_apps: [{label:"Disney+", pkg:"com.disney.disneyplus"}, {label:"Max", pkg:"com.wbd.stream"}, {label:"Play Games", pkg:"com.google.android.play.games", system:true}],                                 // IANA zones, offline, DST-aware
   columns: 4,                           // tiles per row; the dock always has this many slots
   animations: true,
   advanced_effects: false,              // lifted tile, banner zoom, crossfaded glow
@@ -549,14 +551,14 @@ const View = {
       +'<div class="body"><div class="rows">'+html+'</div></div></div>');
     ov.appendChild(el);
   },
-  /* Help: dssoca Card listing the launcher's keys as Kbd chips, under the Help button */
+  /* Help: dssoca Card listing the launcher's keys, then the removed apps (config removed_apps) */
   help(){
     const ov = $("#overlay"); ov.querySelector(".tv-help")?.remove();
     if(!state.help) return;
     const kbd = k => '<kbd class="ss-kbd" data-hide-on-mobile="false"><kbd class="key">'+k+'</kbd></kbd>';
     const el = h('<div class="ss-card tv-help" data-size-variant="md">'
       +'<div class="head"><div class="heading"><div class="title" role="heading" aria-level="2">Using the launcher</div></div><div class="actions"><div class="meta">back to close</div></div></div>'
-      +'<div class="body"><div class="rows">'+HELP.map(([k,t]) => kbd(k)+'<span>'+t+'</span>').join("")+'</div></div></div>');
+      +'<div class="body"><div class="rows">'+HELP.map(([k,t]) => kbd(k)+'<span>'+t+'</span>').join("")+removedRows()+'</div></div></div>');
     const tr = tv.getBoundingClientRect(), r = $('#top [data-top="'+TOP_INDEX.help+'"]').getBoundingClientRect(), sc = tr.width/960;
     el.style.right = (960-(r.right-tr.left)/sc)+"px"; el.style.top = ((r.bottom-tr.top)/sc+8)+"px";
     ov.appendChild(el);
@@ -595,7 +597,7 @@ const SHEET = [
 ];
 /* Help card rows: the same text as the TV build's strings.xml help_* */
 const HELP = [
-  ["← ↑ → ↓", "Move between apps. Up from the dock reaches the top buttons"],
+  ["← ↑ → ↓", "Move between apps. Up from the dock reaches the top buttons. Up and down scroll this card"],
   ["OK", "Open the app, input or button. The sliders button opens Launcher settings"],
   ["Hold OK · app", "App info: force stop, storage, disable"],
   ["Hold OK · gear", "Launcher menu: Launcher settings and Reorder apps"],
@@ -604,6 +606,14 @@ const HELP = [
   ["Reorder", "OK picks up an app, arrows move it, Back places it, Back again saves"],
   ["config.json", "Android/data/dev.passoca.tvhome/files/config.json. Follow config in Launcher settings drops the choices made on the TV"]
 ];
+function removedRows(){
+  const r = CONFIG.removed_apps || []; if(!r.length) return "";
+  const kbd = k => '<kbd class="ss-kbd" data-hide-on-mobile="false"><kbd class="key">'+k+'</kbd></kbd>';
+  const play = r.filter(a => !a.system).map(a => a.label), sys = r.filter(a => a.system).map(a => a.label);
+  return '<div class="group" style="grid-column:1/-1;margin-top:6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ss-fg-faint)">Removed apps</div>'
+    +(play.length ? kbd("Play Store")+'<span>'+play.join(" · ")+'</span>' : "")
+    +(sys.length ? kbd("TV app")+'<span>'+sys.join(" · ")+'</span><span></span><span>Put a TV app back over ADB: adb shell cmd package install-existing &lt;package&gt;. The package names are in config.json under removed_apps</span>' : "");
+}
 const SHEET_ROWS = SHEET.filter(r => !r.group && !r.break && r.type!=="info");
 
 /* sync(): apply state to the built DOM (cheap; runs after every dispatch) */
@@ -726,7 +736,10 @@ const Zones = {
     else if(sh.col===0){ dispatch("resetCfg"); View.tiles(true); View.toast("Back to the config's settings","success"); }
     else View.toast("This launcher is Home. Choosing the original home hands Home back to it.");
   },
-  help(key){ if(key==="BACK" || key==="DPAD_CENTER") dispatch("closeHelp"); },
+  help(key){
+    if(key==="DPAD_DOWN" || key==="DPAD_UP"){ $(".tv-help").scrollBy({top: key==="DPAD_DOWN" ? 72 : -72, behavior:"smooth"}); return; }
+    if(key==="BACK" || key==="DPAD_CENTER") dispatch("closeHelp");
+  },
   screen(key){ if(key==="BACK") Actions.closeScreen(); }
 };
 
