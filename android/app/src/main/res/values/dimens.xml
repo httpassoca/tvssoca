@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- dssoca md size tokens. Everything else on Home is placed by core/Layout in dp. -->
+<resources>
+    <dimen name="ss_ui_xs">11sp</dimen>
+    <dimen name="ss_ui_sm">12sp</dimen>
+    <dimen name="ss_ui_md">13sp</dimen>
+    <dimen name="ss_ui_lg">15sp</dimen>
+    <dimen name="ss_icon">20dp</dimen>
+    <dimen name="ss_control_font">14sp</dimen>
+    <dimen name="ss_control_py">9dp</dimen>
+    <dimen name="ss_control_px">16dp</dimen>
+    <dimen name="ss_gap">14dp</dimen>
+    <dimen name="ss_gap_sm">10dp</dimen>
+    <dimen name="ss_menu_pad">4dp</dimen>
+    <dimen name="ss_menu_item_py">8dp</dimen>
+    <dimen name="ss_menu_item_px">12dp</dimen>
+    <dimen name="ss_menu_item_gap">10dp</dimen>
+    <dimen name="ss_card_px">18dp</dimen>
+    <dimen name="ss_card_py">16dp</dimen>
+    <dimen name="ss_panel_head_py">12dp</dimen>
+</resources>

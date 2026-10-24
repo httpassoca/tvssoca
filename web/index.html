@@ -1,0 +1,887 @@
+<title>dssoca TV Home</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="dssoca/theme.css">
+<link rel="stylesheet" href="dssoca/vanilla.css">
+<style>
+/* Layout: the dssoca shell (square, 1px lines, signal green on near-black) around a 960x540 dp TV canvas.
+   Inside .tv every number is launcher dp, so the geometry ports 1:1 to the Android build.
+   Colour, type, spacing and motion come only from dssoca tokens (--ss-*); the few local tokens below
+   are TV-specific measures, not new colours. */
+:root{
+  --tv-w:960px; --tv-h:540px;
+  --tv-focus-scale:1.10;           /* AppAdapter.FOCUS_SCALE */
+  --tv-glow-a:38%; --tv-glow-b:14%;/* ambient app glow strength, softened for dssoca */
+}
+html,body{height:100%}
+body{margin:0;background:var(--ss-bg);color:var(--ss-fg);font-family:var(--ss-font-body)}
+.app{min-height:100%;background:var(--ss-bg);color:var(--ss-fg);font-family:var(--ss-font-body);font-size:var(--ss-ui-md);
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.shell{max-width:1180px;margin:0 auto;padding-block:var(--ss-s-6) var(--ss-s-10);display:flex;flex-direction:column;gap:var(--ss-block-gap)}
+.intro{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:var(--ss-s-3) var(--ss-s-8)}
+.intro .ss-heading{margin:0}
+.intro p{margin:0;max-width:62ch;color:var(--ss-fg-muted);font-size:var(--ss-ui-md);line-height:var(--ss-leading)}
+.intro p b{color:var(--ss-fg);font-weight:500}
+
+/* ── TV screen ─────────────────────────────────────────────────────────── */
+.bezel{background:#050506;padding:8px;box-shadow:var(--ss-shadow-pop), 0 0 0 1px var(--ss-line)}
+.screen{position:relative;aspect-ratio:16/9;width:100%;max-width:100%;overflow:hidden;outline:none;background:var(--ss-bg)}
+.screen:focus-visible{box-shadow:0 0 0 2px var(--ss-primary)}
+.tv{position:absolute;left:0;top:0;width:var(--tv-w);height:var(--tv-h);transform-origin:0 0;overflow:hidden;
+  background:var(--ss-bg);color:var(--ss-fg);user-select:none;contain:layout paint}
+.tv .layer-fill{position:absolute;inset:0}
+.tv-wall{background-size:cover;background-position:center;opacity:0;transition:opacity var(--ss-dur-xslow) var(--ss-ease)}
+.tv-wall.on{opacity:1}
+.tv-wallscrim{background:linear-gradient(to bottom, color-mix(in srgb,var(--ss-bg) 35%,transparent), color-mix(in srgb,var(--ss-bg) 55%,transparent) 55%, color-mix(in srgb,var(--ss-bg) 85%,transparent));opacity:0;transition:opacity var(--ss-dur-slow)}
+.tv-wallscrim.on{opacity:1}
+.tv-grid-bg{background-image:linear-gradient(var(--ss-line) 1px,transparent 1px),linear-gradient(90deg,var(--ss-line) 1px,transparent 1px);
+  background-size:48px 48px;background-position:-1px -1px;opacity:.35;
+  mask-image:radial-gradient(ellipse 80% 70% at 50% 40%,#000,transparent 75%)}
+.tv-glow{opacity:0}
+.home{transition:opacity var(--ss-dur) var(--ss-ease), transform var(--ss-dur) var(--ss-ease)}
+.home.away{opacity:.25;transform:scale(1.025)}
+@keyframes tv-home-in{from{opacity:.65;transform:scale(.97)}to{opacity:1;transform:none}}
+.home.back{animation:tv-home-in var(--ss-dur) var(--ss-ease)}
+
+/* header */
+.tv-header{position:absolute;left:56px;right:56px;top:28px;display:flex;align-items:flex-end;justify-content:space-between;gap:16px}
+.tv-clockrow{display:flex;align-items:flex-end;margin-top:6px}
+.tv-clock{font-family:var(--ss-font-display);font-size:54px;line-height:.9;letter-spacing:-.01em;color:var(--ss-fg-shine);font-variant-numeric:tabular-nums}
+.tv-ampm{margin:0 0 4px 8px;font-size:var(--ss-ui-sm);letter-spacing:.1em;color:var(--ss-fg-muted)}
+.tv-rule{width:1px;height:40px;margin:0 18px 2px;background:var(--ss-line-strong)}
+.tv-datecol{display:flex;flex-direction:column;gap:7px;margin-bottom:2px;min-width:0}
+.tv-info{display:flex;align-items:center;gap:10px;font-size:var(--ss-ui-sm);color:var(--ss-fg-muted);white-space:nowrap}
+.tv-info b{font-weight:500;color:var(--ss-fg-shine);font-variant-numeric:tabular-nums}
+.tv-info svg{width:16px;height:16px;fill:currentColor;flex:none}
+.tv-info .it{display:inline-flex;align-items:center;gap:6px}
+.tv-info .city{font-size:var(--ss-ui-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--ss-fg-faint)}
+.tv-info .sep{width:1px;height:12px;background:var(--ss-line-strong)}
+.tv-date{font-size:var(--ss-ui-sm);letter-spacing:.14em;text-transform:uppercase;color:var(--ss-fg-muted);white-space:pre}
+.tv-right{display:flex;flex-direction:column;align-items:flex-end;gap:6px}
+.tv-pills{display:flex;align-items:stretch;gap:var(--ss-gap-sm)}
+.tv-caption{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--ss-fg-faint);min-height:14px;transition:opacity var(--ss-dur)}
+/* header module cards (weather, world clock): MetricTile-shaped readouts in the top row */
+.tv-wid{display:flex;align-items:center;gap:10px;padding:0 12px;box-sizing:border-box;cursor:pointer;
+  border:1px solid var(--ss-line);background:color-mix(in srgb,var(--ss-bg) 72%,transparent);backdrop-filter:blur(6px);
+  transition:border-color var(--ss-dur-fast) var(--ss-ease), box-shadow var(--ss-dur-fast) var(--ss-ease), background var(--ss-dur-fast)}
+.tv-wid .wk{display:flex;flex-direction:column;gap:1px}
+.tv-wid .wk span:first-child{font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:var(--ss-fg-faint);display:flex;align-items:center;gap:5px}
+.tv-wid .wk span:first-child i{width:5px;height:5px;display:block}
+.tv-wid .wk span+span{font-size:var(--ss-ui-xs);color:var(--ss-fg-muted);white-space:nowrap}
+.tv-wid .wv{font-family:var(--ss-font-display);font-size:22px;line-height:1;color:var(--ss-fg-shine);font-variant-numeric:tabular-nums}
+.tv-wid.is-focus{border-color:var(--ss-primary);background:var(--ss-primary-soft);box-shadow:var(--ss-shadow-glow)}
+.tv-pills .ss-btn{background:color-mix(in srgb,var(--ss-bg) 72%,transparent);backdrop-filter:blur(6px);white-space:nowrap}
+.tv-pills .ss-btn svg{width:var(--ss-icon);height:var(--ss-icon);fill:currentColor}
+.tv-pills .ss-btn.primary{transform:translateY(-1px)}
+.tv-pills .ss-btn.is-armed{border-color:var(--ss-blue);color:var(--ss-blue)}
+
+/* rows of tiles */
+.tv-grid{clip-path:inset(118px 0 0 0)}
+.tv-content{position:absolute;left:0;top:0;width:var(--tv-w);height:var(--tv-h);will-change:transform}
+.tv-band{position:absolute;background:color-mix(in srgb,var(--ss-bg-elev) 88%,transparent);border:1px solid var(--ss-line);box-sizing:border-box}
+.tv-tile{position:absolute;left:0;top:0;cursor:pointer}
+.tv-tile .in{position:absolute;inset:0}
+.tv-card{position:absolute;inset:0;overflow:hidden;background:var(--ss-bg-elev);box-shadow:0 0 0 1px var(--ss-line);
+  transition:transform var(--ss-dur) var(--ss-ease), box-shadow var(--ss-dur) var(--ss-ease)}
+.tv-ban{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;transition:transform var(--ss-dur-slow) var(--ss-ease)}
+.tv-tile.is-focus .tv-card{transform:scale(var(--tv-focus-scale))}
+.tv-tile.is-focus.overshoot .tv-card{transition:transform 340ms cubic-bezier(.34,1.56,.64,1), box-shadow var(--ss-dur)}
+.tv-tile.is-focus.lift .tv-card{box-shadow:0 0 0 1px var(--ss-line), var(--ss-shadow-pop)}
+.tv-tile.is-focus.lift .tv-ban{transform:scale(1.035)}
+.tv-tile.is-picked .tv-card{transform:scale(1.16)}
+.tv-name{position:absolute;left:-10px;right:-10px;top:calc(100% + 9px);text-align:center;font-size:var(--ss-ui-md);letter-spacing:.02em;color:var(--ss-fg);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;opacity:0;transform:translateY(-6px);transition:opacity var(--ss-dur-fast), transform var(--ss-dur-fast)}
+.tv-tile.is-focus .tv-name.on{opacity:1;transform:none}
+@keyframes tv-tile-in{from{opacity:0;transform:translateY(22%) scale(.94)}to{opacity:1;transform:none}}
+.tv-tile.enter .in{animation:tv-tile-in 420ms var(--ss-ease) both;animation-delay:inherit}
+/* module card tile: a MetricTile-shaped readout */
+.tv-mod{flex-direction:column;align-items:flex-start;justify-content:space-between;padding:12px 14px;box-sizing:border-box;background:var(--ss-bg-elev)}
+.tv-mod .k{font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ss-fg-faint);display:flex;align-items:center;gap:6px}
+.tv-mod .k i{width:6px;height:6px;display:block}
+.tv-mod .v{font-family:var(--ss-font-display);font-size:30px;line-height:1;color:var(--ss-fg-shine);font-variant-numeric:tabular-nums}
+.tv-mod .s{font-size:11px;color:var(--ss-fg-muted)}
+
+/* focus frame: the launcher's GlassView, redrawn as a dssoca focus ring */
+.tv-frame{position:absolute;left:0;top:0;opacity:0;pointer-events:none;box-sizing:border-box;border:2px solid var(--ss-primary);
+  box-shadow:var(--ss-shadow-glow), inset 0 0 0 1px color-mix(in srgb,var(--ss-bg) 60%,transparent);
+  transition:opacity var(--ss-dur-fast), border-color var(--ss-dur), box-shadow var(--ss-dur);will-change:transform,width,height}
+.tv-frame.reorder{border-color:var(--ss-blue);box-shadow:0 0 24px color-mix(in srgb,var(--ss-blue) 35%,transparent)}
+
+/* hero shelf */
+.tv-hero{position:absolute;left:66px;pointer-events:none;transition:opacity var(--ss-dur-fast)}
+.tv .tv-hero .ss-heading{--ss-heading-size:56px;margin:0;white-space:nowrap}
+.tv-hero .meta{display:flex;align-items:center;gap:12px;margin-top:12px;font-size:var(--ss-ui-sm);color:var(--ss-fg-muted)}
+
+/* popups use dssoca Menu (.ss-menu > .panel.open > .item); D-pad focus mirrors its :focus-visible */
+.tv-menu{position:absolute;z-index:30}
+.tv-menu .panel{min-width:240px}
+.tv-menu .item.is-focus{color:var(--ss-fg);background:var(--ss-primary-soft);box-shadow:inset 3px 0 0 0 var(--ss-primary)}
+.tv-menu .item svg{width:var(--ss-icon);height:var(--ss-icon);fill:currentColor}
+.tv-menu .item .ss-badge{margin-left:auto}
+.tv-menu .rule{height:1px;margin:4px 8px;background:var(--ss-line)}
+.tv-menu .item .lead.swatch{width:44px;height:25px;background-size:cover;background-position:center}
+.tv-menu .item .marker{color:var(--ss-primary);width:var(--ss-icon);display:inline-flex;justify-content:center}
+.tv-menu.tall .panel{max-height:360px;overflow-y:auto;scrollbar-width:thin}
+.tv-menu .panel{max-width:380px}
+.tv-menu .item .label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tv-sheet .srcline{display:flex;align-items:center;gap:8px;font-size:var(--ss-ui-xs);color:var(--ss-fg-muted);min-width:0}
+.tv-sheet .srcline svg{width:14px;height:14px;fill:currentColor;flex:none}
+.tv-sheet .srcline span:first-of-type{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tv-sheet .pickv{display:flex;align-items:center;gap:10px;color:var(--ss-fg-muted);font-size:var(--ss-ui-sm)}
+.tv-sheet .pickv .thumb{width:48px;height:27px;background-size:cover;background-position:center;box-shadow:0 0 0 1px var(--ss-line)}
+.tv-menu .cap{padding:6px 16px 8px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ss-fg-faint)}
+
+/* launcher settings: dssoca Card with Segmented, Switch and Button controls */
+.tv-sheet{position:absolute;left:70px;top:44px;width:820px;z-index:10;box-shadow:var(--ss-shadow-pop);animation:tv-fade var(--ss-dur) var(--ss-ease) both}
+.tv-sheet .rows{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0 32px;align-items:start}
+.tv-sheet .col{display:flex;flex-direction:column;gap:6px;min-width:0}
+.tv-sheet .col > .group:first-child{margin-top:0;border-top:0;padding-top:0}
+.tv-sheet .rows > .acts{grid-column:1 / -1;margin-top:14px;padding-top:14px;border-top:1px solid var(--ss-line)}
+.tv-sheet .srow{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:6px 16px;min-height:38px}
+.tv-sheet .srow.pick{cursor:pointer;padding:0 8px;margin:0 -8px}
+.tv-sheet .srow.pick.is-focus{background:var(--ss-primary-soft);box-shadow:inset 3px 0 0 0 var(--ss-primary)}
+.tv-sheet .group{margin:6px 0 0;padding-top:8px;border-top:1px solid var(--ss-line);font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:var(--ss-fg-faint)}
+.tv-sheet .slab{display:flex;flex-direction:column;gap:2px}
+.tv-sheet .slab span:first-child{color:var(--ss-fg)}
+.tv-sheet .slab span+span{font-size:var(--ss-ui-xs);color:var(--ss-fg-faint)}
+.tv-sheet .acts{display:flex;gap:var(--ss-gap-sm);margin-top:4px}
+.is-focus.segment{box-shadow:inset 0 0 0 2px var(--ss-fg-shine)!important}
+.is-focus.segment:not(.selected){color:var(--ss-fg)}
+.track.is-focus,.ss-btn.is-focus{outline:2px solid var(--ss-primary);outline-offset:3px;box-shadow:var(--ss-shadow-glow)}
+
+/* full screens owned by other apps on a real TV */
+@keyframes tv-fade{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.tv-screen{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;background:var(--ss-bg);animation:tv-fade var(--ss-dur) var(--ss-ease) both}
+.tv .tv-screen .ss-heading{--ss-heading-size:48px;margin:0}
+.tv-screen .sub{max-width:52ch;text-align:center;color:var(--ss-fg-muted);font-size:var(--ss-ui-md);line-height:var(--ss-leading)}
+.tv-screen .foot{position:absolute;left:0;right:0;bottom:28px;display:flex;justify-content:center;align-items:center;gap:8px;font-size:var(--ss-ui-xs);color:var(--ss-fg-faint);letter-spacing:.06em}
+.tv-screen .art{width:288px;height:162px;display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 1px var(--ss-line)}
+.tv-toaster.ss-toaster{z-index:20}
+
+/* ── controls under the TV ───────────────────────────────────────────── */
+.deck{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--ss-s-8);align-items:start}
+@media (max-width:760px){.deck{grid-template-columns:minmax(0,1fr)}}
+.deck .ss-card{min-width:0}
+.cfg{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--ss-gap) var(--ss-s-6);align-items:center}
+.cfg .k{font-size:var(--ss-ui-xs);letter-spacing:.14em;text-transform:uppercase;color:var(--ss-fg-faint)}
+.cfg .ss-segmented{flex-wrap:wrap}
+@media (max-width:480px){.cfg{grid-template-columns:minmax(0,1fr)}}
+.keys{display:grid;grid-template-columns:auto minmax(0,1fr);gap:var(--ss-gap-xs) var(--ss-gap);align-items:center;margin-top:var(--ss-gap);
+  padding-top:var(--ss-gap);border-top:1px solid var(--ss-line);color:var(--ss-fg-muted);font-size:var(--ss-ui-sm)}
+.remote{width:216px;justify-self:center}
+.remote .body{display:flex;flex-direction:column;align-items:center;gap:var(--ss-gap)}
+.dpad{display:grid;grid-template-columns:repeat(3,52px);grid-template-rows:repeat(3,52px);gap:4px}
+.dpad .ss-btn{width:52px;height:52px;justify-content:center;padding:0}
+.dpad .ss-btn svg,.rrow .ss-btn svg{width:18px;height:18px;fill:currentColor}
+.dpad .ok{grid-column:2;grid-row:2}
+.dpad .u{grid-column:2;grid-row:1}.dpad .l{grid-column:1;grid-row:2}.dpad .r{grid-column:3;grid-row:2}.dpad .d{grid-column:2;grid-row:3}
+.rrow{display:flex;gap:4px}
+.rrow .ss-btn{width:52px;height:44px;justify-content:center;padding:0}
+.remote .hint{font-size:var(--ss-ui-xs);color:var(--ss-fg-faint);text-align:center}
+.notes{font-size:var(--ss-ui-sm);color:var(--ss-fg-faint);line-height:var(--ss-leading);border-top:1px solid var(--ss-line);padding-top:var(--ss-gap);max-width:110ch}
+.notes code{color:var(--ss-fg-muted)}
+</style>
+
+<div class="app" id="app" data-theme="dark" data-size-variant="md">
+<div class="shell">
+  <div class="intro">
+    <h1 class="ss-heading accent" data-size-variant="sm"><span class="txt">TV Home</span></h1>
+    <p>The CleanYourTV launcher interface rebuilt on <b>dssoca 0.19</b>. Behaviour, geometry and focus physics are the launcher's; every surface, colour and type choice is a dssoca token or component. Click the screen and drive it with a remote.</p>
+  </div>
+
+  <div class="bezel">
+    <div class="screen" id="screen" tabindex="0" aria-label="TV home screen. Arrow keys move, Enter selects, Escape goes back.">
+      <div class="tv" id="tv" data-theme="dark" data-size-variant="md"></div>
+    </div>
+  </div>
+
+  <div class="deck">
+    <div class="ss-card" data-size-variant="md">
+      <div class="head"><div class="heading"><div class="title" role="heading" aria-level="2">Keys</div></div><div class="actions"><div class="meta">dark · md</div></div></div>
+      <div class="body">
+        <div class="keys" style="margin-top:0;padding-top:0;border-top:0">
+          <kbd class="ss-kbd"><kbd class="key">←</kbd><kbd class="key">↑</kbd><kbd class="key">→</kbd><kbd class="key">↓</kbd></kbd><span>Move focus (D-pad)</span>
+          <kbd class="ss-kbd"><kbd class="key">Enter</kbd></kbd><span>OK. Hold half a second for the long press on tiles and Settings</span>
+          <kbd class="ss-kbd"><kbd class="key">Esc</kbd></kbd><span>Back</span>
+          <kbd class="ss-kbd"><kbd class="key">H</kbd></kbd><span>Home button</span>
+          <kbd class="ss-kbd"><kbd class="key">S</kbd></kbd><span>Remote's Settings button. Launcher settings holds the wallpaper choice</span>
+        </div>
+      </div>
+    </div>
+    <div class="ss-card remote" data-size-variant="md" aria-label="Remote">
+      <div class="head"><div class="heading"><div class="title" role="heading" aria-level="2">Remote</div></div></div>
+      <div class="body">
+        <div class="dpad">
+          <button class="ss-btn u" type="button" data-k="DPAD_UP" aria-label="Up"><svg viewBox="0 0 10 10"><path d="M5 1 10 8H0z"/></svg></button>
+          <button class="ss-btn l" type="button" data-k="DPAD_LEFT" aria-label="Left"><svg viewBox="0 0 10 10"><path d="M1 5 8 0v10z"/></svg></button>
+          <button class="ss-btn primary ok" type="button" id="okKey" aria-label="OK, hold for long press"><span class="label">OK</span></button>
+          <button class="ss-btn r" type="button" data-k="DPAD_RIGHT" aria-label="Right"><svg viewBox="0 0 10 10"><path d="M9 5 2 10V0z"/></svg></button>
+          <button class="ss-btn d" type="button" data-k="DPAD_DOWN" aria-label="Down"><svg viewBox="0 0 10 10"><path d="M5 9 0 2h10z"/></svg></button>
+        </div>
+        <div class="rrow">
+          <button class="ss-btn" type="button" data-k="BACK" aria-label="Back"><svg viewBox="0 0 24 24"><path d="M20 11H7.8l5.6-5.6L12 4l-8 8 8 8 1.4-1.4L7.8 13H20z"/></svg></button>
+          <button class="ss-btn" type="button" data-k="HOME" aria-label="Home"><svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></button>
+          <button class="ss-btn" type="button" data-k="SETTINGS" aria-label="Settings button"><svg viewBox="0 0 24 24"><path d="M19.1 12.9a7 7 0 0 0 0-1.9l2-1.6-1.9-3.3-2.4 1a7 7 0 0 0-1.6-1L14.8 3.6h-3.8l-.4 2.5a7 7 0 0 0-1.6 1l-2.4-1-1.9 3.3 2 1.6a7 7 0 0 0 0 1.9l-2 1.6 1.9 3.3 2.4-1a7 7 0 0 0 1.6 1l.4 2.5h3.8l.4-2.5a7 7 0 0 0 1.6-1l2.4 1 1.9-3.3zM12.9 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"/></svg></button>
+        </div>
+        <div class="hint">hold OK for the long press</div>
+      </div>
+    </div>
+  </div>
+
+  <p class="notes">The CSS comes from dssoca's own <code>theme.css</code> and <code>vanilla.css</code> (0.19.0). The page uses dssoca's Button, Menu, Badge, Card, Segmented control, Switch, Heading, Kbd and Toaster as they come. The code is split into config, catalog, store, layout, views, focus and motion. The config keys match the launcher's <code>config.xml</code>, and the input layer speaks Android key names (<code>DPAD_UP</code>, <code>BACK</code>…), so a TV build can reuse the logic and swap only the view layer. App tiles are invented stand-ins.</p>
+</div>
+</div>
+
+<script>
+(() => {
+"use strict";
+
+/* ═════════════════════════════════════════════════════════════════════════
+   1. CONFIG — same keys as launcher/app/src/main/res/values/config.xml and a
+      theme's config.json (themes/README.md). A TV build reads the same object.
+   ═════════════════════════════════════════════════════════════════════════ */
+const CONFIG = {
+  dock_apps: ["flick","tide","loop","star"],
+  // header line under the date, computed by the launcher itself (no add-on app needed)
+  weather: {latitude: null, longitude: null, units: "celsius", refresh_minutes: 30},  // Open-Meteo, no API key
+  world_clocks: [{label: "Tokyo", tz: "Asia/Tokyo"}],                                 // IANA zones, offline, DST-aware
+  columns: 4,                           // tiles per row; the dock always has this many slots
+  animations: true,
+  advanced_effects: false,              // lifted tile, banner zoom, crossfaded glow
+  focus_overshoot: true,                // spring past the target before settling
+  ambient_glow: true,
+  dock_title: true,
+  reduced_motion: matchMedia("(prefers-reduced-motion: reduce)").matches,
+  // wallpapers: the theme's wallpapers/ folder (JPEG, PNG or WebP; up to 100 pictures of 10 MB)
+  wallpaper: true,                      // false draws no picture
+  wallpaper_rotation_minutes: 60,       // 0 keeps one picture
+  wallpaper_order: "shuffle",           // shuffle | sequential (filename order, wraps)
+  wallpaper_captions: false,            // the folder has no captions.txt, so no name under the top row
+  wallpaper_dim: 45                     // dark overlay over the picture, percent
+};
+/* Wallpaper source: a folder in a GitHub repo. The TV build syncs it into a local cache (download when
+   online, show the cache always). This page cannot reach GitHub, so it ships a snapshot of the folder
+   (commit 1fe2db4, converted to 1600x900 JPEG) in the same shape the cache would hold. */
+const WALLPAPER_SOURCE = {repo:"httpassoca/dotfiles", branch:"main", path:"macOS/wallpapers", snapshot:"1fe2db4"};
+const humanize = f => { const n = f.replace(/\.[a-z]+$/i,"").replace(/^(wp\d+|wallhaven)-/,"").replace(/[-_]+/g," ").trim(); return n.charAt(0).toUpperCase()+n.slice(1); };
+const WALLPAPERS = [
+  "a_black_and_white_drawing_of_a_robot_with_a_halo.jpg","a_black_and_white_image_of_a_room.jpg",
+  "a_cartoon_of_a_woman_with_long_hair.jpg","a_house_with_a_bike_and_a_chair.jpg",
+  "a_person_on_a_surfboard_in_the_water_with_birds_flying_in_the_sky.jpg","a_sculpture_of_a_man_with_a_face_on_his_head.jpg",
+  "a_statue_of_a_man_standing_on_a_pedestal_in_front_of_a_row_of_flags.jpg","a_street_with_buildings_and_signs.jpg",
+  "japan-background-digital-art.jpg","wallhaven-vqwlwl.jpg",
+  "wp5683360-4k-anime-scenery-wallpapers.jpg","wp8409414-anime-mac-wallpapers.jpg"
+].map(file => ({file, caption: humanize(file), src: "wall-dotfiles/"+file}));
+
+/* ═════════════════════════════════════════════════════════════════════════
+   2. CATALOG — invented stand-in apps (a TV build lists installed packages)
+   ═════════════════════════════════════════════════════════════════════════ */
+const STAR = '<svg viewBox="0 0 24 24" width="28" height="28"><path fill="#fff" d="M12 0c.6 6.4 5 11 12 12-7 .9-11.4 5.6-12 12-.6-6.4-5-11.1-12-12C7 11 11.4 6.4 12 0z"/></svg>';
+const MARK = "font-family:'Electrolize',sans-serif";
+const CATALOG = {
+  flick:{label:"Flick", color:"#D81F26", bg:"#FFFFFF", logo:'<span style="'+MARK+';font-size:46px;color:#D81F26;letter-spacing:.04em">FLICK</span>'},
+  tide:{label:"Tidewave", color:"#0B6BF2", bg:"#0B6BF2", logo:'<span style="display:flex;flex-direction:column;align-items:center;'+MARK+';font-size:34px;color:#fff;line-height:1">tidewave<svg width="70" height="12" viewBox="0 0 70 12"><path d="M2 6c8-8 14 8 22 0s14 8 22 0 14 8 22 0" stroke="#fff" stroke-width="3" fill="none"/></svg></span>'},
+  loop:{label:"Loop", color:"#E62117", bg:"#F4F4F4", logo:'<span style="display:flex;align-items:center;gap:10px;'+MARK+';font-size:38px;color:#202020"><svg width="48" height="34" viewBox="0 0 48 34"><rect width="48" height="34" fill="#E62117"/><path d="M19 9v16l13-8z" fill="#fff"/></svg>Loop</span>'},
+  star:{label:"Starlit", color:"#6A2BE2", bg:"linear-gradient(120deg,#1546E8,#8E2BE2 55%,#E8148C)", logo:'<span style="display:flex;align-items:center;gap:8px;'+MARK+';font-size:34px;color:#fff">'+STAR+'Starlit</span>'},
+  cine:{label:"Cinemond", color:"#FF6A1A", bg:"#FF6A1A", logo:'<span style="'+MARK+';font-size:34px;color:#fff">cinemond</span>'},
+  arca:{label:"Arcadia Games", color:"#8C8C96", bg:"#232326", logo:'<span style="'+MARK+';font-size:22px;color:#EDEDED;letter-spacing:.38em;padding-left:.38em">ARCADIA</span>'},
+  pulse:{label:"Pulse Music", color:"#5B4BF5", bg:"linear-gradient(135deg,#6C3BF5,#3B7BF5)", logo:'<span style="display:flex;align-items:flex-end;gap:10px;'+MARK+';font-size:34px;color:#fff;line-height:1"><svg width="28" height="28" viewBox="0 0 28 28"><rect x="0" y="11" width="5" height="17" fill="#fff"/><rect x="8" y="3" width="5" height="25" fill="#fff"/><rect x="16" y="8" width="5" height="20" fill="#fff"/><rect x="24" y="15" width="4" height="13" fill="#fff"/></svg>pulse</span>'},
+  lumen:{label:"Lumen Photos", color:"#E0A800", bg:"#FFFFFF", logo:'<span style="display:flex;align-items:center;gap:9px;'+MARK+';font-size:32px;color:#333"><svg width="32" height="32" viewBox="0 0 32 32"><rect width="15" height="15" fill="#F2B705"/><rect x="17" width="15" height="15" fill="#E8483C"/><rect y="17" width="15" height="15" fill="#2E9BEF"/><rect x="17" y="17" width="15" height="15" fill="#2FB85A"/></svg>lumen</span>'},
+  kanal:{label:"Kanal Live", color:"#12A383", bg:"#0E7C66", logo:'<span style="display:flex;align-items:center;gap:10px;'+MARK+';font-size:30px;color:#fff;letter-spacing:.06em">KANAL<span style="font-size:13px;letter-spacing:.12em;background:#fff;color:#0E7C66;padding:3px 7px">LIVE</span></span>'},
+  surf:{label:"Surf Browser", color:"#3D7BFF", bg:"#18181B", logo:'<span style="display:flex;align-items:center;gap:10px;'+MARK+';font-size:32px;color:#fff"><svg width="32" height="32" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" fill="none" stroke="#3D7BFF" stroke-width="2"/><path d="M2 12h20M12 2c3 3 3 17 0 20M12 2c-3 3-3 17 0 20" fill="none" stroke="#3D7BFF" stroke-width="1.6"/></svg>Surf</span>'}
+};
+const GRID_APPS = ["cine","arca","pulse","lumen","kanal","surf"];
+const INPUTS = [
+  {id:"HW1", label:"HDMI 1"},
+  {id:"HW2", label:"HDMI 2", device:"Media box"},
+  {id:"HW3", label:"HDMI 3"},
+  {id:"HW4", label:"HDMI 4", device:"PlayStation 5"},
+  {sep:true}, {id:"AV", label:"AV", icon:"av"}, {sep:true}, {id:"LIVE", label:"Live TV", icon:"livetv"}
+];
+
+/* icons: the launcher's res/drawable vectors */
+const ICON = {
+  input:'M18,7V4c0,-1.1 -0.9,-2 -2,-2H8C6.9,2 6,2.9 6,4v3H5v6l3,6v3h8v-3l3,-6V7H18zM8,4h8v3h-2V5h-1v2h-2V5h-1v2H8V4z',
+  wifi:'M1,9l2,2c4.97,-4.97 13.03,-4.97 18,0l2,-2C16.93,2.93 7.08,2.93 1,9zM9,17l3,3 3,-3c-1.65,-1.66 -4.34,-1.66 -6,0zM5,13l2,2c2.76,-2.76 7.24,-2.76 10,0l2,-2C15.14,9.14 8.87,9.14 5,13z',
+  settings:'M19.14,12.94c0.04,-0.3 0.06,-0.61 0.06,-0.94c0,-0.32 -0.02,-0.64 -0.07,-0.94l2.03,-1.58c0.18,-0.14 0.23,-0.41 0.12,-0.61l-1.92,-3.32c-0.12,-0.22 -0.37,-0.29 -0.59,-0.22l-2.39,0.96c-0.5,-0.38 -1.03,-0.7 -1.62,-0.94L14.4,2.81c-0.04,-0.24 -0.24,-0.41 -0.48,-0.41h-3.84c-0.24,0 -0.43,0.17 -0.47,0.41L9.25,5.35C8.66,5.59 8.12,5.92 7.63,6.29L5.24,5.33c-0.22,-0.08 -0.47,0 -0.59,0.22L2.74,8.87C2.62,9.08 2.66,9.34 2.86,9.48l2.03,1.58C4.84,11.36 4.8,11.69 4.8,12s0.02,0.64 0.07,0.94l-2.03,1.58c-0.18,0.14 -0.23,0.41 -0.12,0.61l1.92,3.32c0.12,0.22 0.37,0.29 0.59,0.22l2.39,-0.96c0.5,0.38 1.03,0.7 1.62,0.94l0.36,2.54c0.05,0.24 0.24,0.41 0.48,0.41h3.84c0.24,0 0.44,-0.17 0.47,-0.41l0.36,-2.54c0.59,-0.24 1.13,-0.56 1.62,-0.94l2.39,0.96c0.22,0.08 0.47,0 0.59,-0.22l1.92,-3.32c0.12,-0.22 0.07,-0.47 -0.12,-0.61L19.14,12.94zM12,15.6c-1.98,0 -3.6,-1.62 -3.6,-3.6s1.62,-3.6 3.6,-3.6s3.6,1.62 3.6,3.6S13.98,15.6 12,15.6z',
+  av:'M5 3h2v4h1v6H7v8H5v-8H4V7h1zm6 0h2v8h1v6h-1v4h-2v-4h-1v-6h1zm6 0h2v2h1v6h-1v10h-2V11h-1V5h1z',
+  livetv:'M21 6h-7.6l3.3-3.3-.7-.7L12 6 8 2l-.7.7L10.6 6H3a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h18a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2zm0 13H3V8h18zM9 10v8l6-4z',
+  picture:'M21 3H3a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h5v2h8v-2h5a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm0 14H3V5h18z',
+  apps:'M4 8h4V4H4zm6 12h4v-4h-4zm-6 0h4v-4H4zm0-6h4v-4H4zm6 0h4v-4h-4zm6-10v4h4V4zm-6 4h4V4h-4zm6 6h4v-4h-4zm0 6h4v-4h-4z',
+  home:'M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z',
+  swap:'M16 17V10h-2v7h-3l4 4 4-4zM9 3 5 7h3v7h2V7h3z',
+  card:'M3 5h18v14H3zm2 2v10h14V7zm2 2h6v2H7zm0 4h10v2H7z',
+  rotate:'M12 4V1L8 5l4 4V6a6 6 0 1 1-6 6H4a8 8 0 1 0 8-8z',
+  none:'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm0 2a8 8 0 0 1 6.3 12.9L7.1 5.7A8 8 0 0 1 12 4zM4 12c0-1.8.6-3.5 1.7-4.9l11.2 11.2A8 8 0 0 1 4 12z',
+  check:'M9 16.2 4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4z'
+};
+const svg = (name) => '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="'+ICON[name]+'"/></svg>';
+/* Header info: world clocks are pure time-zone maths; weather is one Open-Meteo call the launcher makes
+   itself, cached with its timestamp so the last reading still shows offline. This page cannot reach the
+   network, so it shows a sample reading in the same shape the fetch would store. */
+const Info = {
+  weather: {temp: 17, text: "partly cloudy", fetchedAt: Date.now()},   // last cached reading
+  clockFmt: {},
+  timeIn(tz){ this.clockFmt[tz] ??= new Intl.DateTimeFormat("en-GB", {timeZone: tz, hour: "2-digit", minute: "2-digit", hourCycle: "h23"}); return this.clockFmt[tz].format(new Date()); },
+  render(){
+    const w = this.weather, cloud = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.35 10.04A7.49 7.49 0 0 0 12 4C9.11 4 6.6 5.64 5.35 8.04A5.994 5.994 0 0 0 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/></svg>';
+    const parts = [];
+    if(w) parts.push('<span class="it" title="Weather">'+cloud+'<b>'+w.temp+'°</b>'+w.text+'</span>');
+    CONFIG.world_clocks.forEach(c => parts.push('<span class="it"><span class="city">'+c.label+'</span><b>'+this.timeIn(c.tz)+'</b></span>'));
+    $("#info").innerHTML = parts.join('<span class="sep" aria-hidden="true"></span>');
+  }
+};
+
+/* ═════════════════════════════════════════════════════════════════════════
+   3. STORE — one state object; every change goes through dispatch()
+   ═════════════════════════════════════════════════════════════════════════ */
+const TOP = [
+  {id:"inputs", label:"Inputs", icon:"input"}, {id:"wifi", label:"Wi-Fi: Livingroom 5G", icon:"wifi"}, {id:"settings", label:"Settings", icon:"settings"}];
+const TOP_INDEX = Object.fromEntries(TOP.map((t,i) => [t.id, i]));
+
+const state = {
+  cfg: {...CONFIG},
+  order: [...CONFIG.dock_apps, ...GRID_APPS],
+  zone: "tiles",            // tiles | top | menu | sheet | screen
+  tile: 0, top: 0, dockReturn: 0, scroll: 0,
+  reorder: false, picked: false,
+  menu: null,               // {kind, items, sel, anchor, back}
+  sheet: null,              // {row, col}
+  screen: null,             // {title, sub, art}
+  wallpaperChoice: null,    // null = rotate the collection (theme default) | "none" | a file name
+  wallIndex: 0, wallSince: Date.now(),
+  lastOpened: {}
+};
+const listeners = [];
+function dispatch(action, payload){ reduce(action, payload); listeners.forEach(fn => fn(action)); }
+
+function reduce(a, p){
+  const s = state, n = s.order.length, c = s.cfg.columns;
+  switch(a){
+    case "focusTile": s.zone = "tiles"; s.tile = p; scrollIntoView(); break;
+    case "focusTop": s.zone = "top"; s.top = p; break;
+    case "moveTile": {
+      const q = Layout.cell(s.tile); let t = s.tile;
+      if(p==="left" && q.col>0) t--;
+      else if(p==="right" && q.col<c-1 && t+1<n) t++;
+      else if(p==="down") t = s.tile+c<n ? s.tile+c : (Math.floor((n-1)/c)>q.row ? n-1 : t);
+      else if(p==="up"){
+        if(q.row===0){ if(!s.picked){ s.dockReturn = s.tile; s.zone = "top"; s.top = Layout.topAbove(q.col); } return; }
+        t = s.tile-c;
+      }
+      if(t===s.tile) return;
+      if(s.picked){ [s.order[s.tile], s.order[t]] = [s.order[t], s.order[s.tile]]; }
+      s.tile = t; scrollIntoView(); break;
+    }
+    case "openMenu": s.menu = {...p, sel: p.sel ?? firstItem(p.items), back: s.zone==="menu" ? s.menu.back : s.zone}; s.zone = "menu"; break;
+    case "menuMove": { const m=s.menu; let k=m.sel;
+      do { k += p; } while(k>=0 && k<m.items.length && m.items[k].sep);
+      if(k>=0 && k<m.items.length) m.sel = k; break; }
+    case "closeMenu": s.zone = s.menu ? s.menu.back : "top"; s.menu = null; break;
+    case "openSheet": s.menu = null; s.sheet = s.sheet || {row:0, col:0}; s.zone = "sheet"; break;
+    case "closeSheet": s.sheet = null; s.zone = "top"; break;
+    case "openScreen": s.zoneBefore = s.zone==="menu" ? (s.menu.back==="sheet"?"top":s.menu.back) : s.zone; s.menu = null; s.sheet = null; s.screen = p; s.zone = "screen"; break;
+    case "closeScreen": s.screen = null; s.zone = s.zoneBefore || "tiles"; break;
+    case "launch": s.lastOpened[p] = Date.now(); break;
+    case "reorder": s.reorder = p; s.picked = false; s.menu = null; if(p) s.zone = "tiles"; break;
+    case "pick": s.picked = p; break;
+    case "home": s.menu=null; s.sheet=null; s.screen=null; s.reorder=false; s.picked=false; s.zone="tiles"; s.tile=0; s.scroll=0; break;
+    case "setCfg": Object.assign(s.cfg, p); if(p.columns){ s.tile = Math.min(s.tile, n-1); scrollIntoView(); } break;
+    case "resetCfg": s.cfg = {...CONFIG}; s.order = [...CONFIG.dock_apps, ...GRID_APPS]; s.wallpaperChoice = null; break;
+    case "chooseWallpaper": s.wallpaperChoice = p;
+      if(p && p!=="none") s.wallIndex = WALLPAPERS.findIndex(w => w.file===p);
+      s.wallSince = Date.now(); break;
+    case "nextWallpaper": s.wallIndex = Wallpapers.next(s.wallIndex, s.cfg.wallpaper_order); s.wallSince = Date.now(); break;
+  }
+}
+const firstItem = items => Math.max(0, items.findIndex(i => !i.sep && !i.cap));
+/* RecyclerView-style scroll: the dock parks at the top line, grid rows scroll just into view */
+function scrollIntoView(){
+  const q = Layout.cell(state.tile);
+  if(q.row===0){ state.scroll = 0; return; }
+  const top = q.y-10, bottom = q.y+q.h+38;
+  if(bottom-state.scroll > 500) state.scroll = bottom-500;
+  if(top-state.scroll < 128) state.scroll = top-128;
+}
+
+/* ═════════════════════════════════════════════════════════════════════════
+   4. LAYOUT + WALLPAPER RULES — pure functions, no DOM
+   ═════════════════════════════════════════════════════════════════════════ */
+const Layout = {
+  tileW(){ return ({4:180,5:144,6:117})[state.cfg.columns]; },
+  tileH(){ return this.tileW()*101/180; },
+  dockTop(){ return 411 - this.tileH()/2; },
+  rowTop(r){ const h=this.tileH(); return r===0 ? this.dockTop() : this.dockTop()+(h+56)+(r-1)*(h+45); },
+  cell(i){
+    const c=state.cfg.columns, row=Math.floor(i/c), col=i%c, span=828/c, w=this.tileW();
+    return {x:66+col*span+(span-w)/2, y:this.rowTop(row), w, h:this.tileH(), row, col};
+  },
+  /* which top-row item sits above a dock column (cards over the middle, icons over the right) */
+  topAbove(col){ return Math.max(0, Math.min(TOP.length-1, col-(state.cfg.columns-TOP.length))); },
+  focusScale(){ return !state.cfg.animations ? 1 : state.cfg.advanced_effects ? 1.12 : 1.10; },
+  spring(){ const c=state.cfg;
+    if(c.reduced_motion) return {k:1400, z:1};
+    if(!c.focus_overshoot) return {k:c.advanced_effects?520:440, z:1};
+    return {k:c.advanced_effects?320:260, z:c.advanced_effects?.76:.58}; }
+};
+const Wallpapers = {
+  /* WallpaperRotation: shuffle avoids repeating the current picture; sequential walks filename order */
+  next(i, order){
+    if(WALLPAPERS.length < 2) return 0;
+    if(order==="sequential") return (i+1) % WALLPAPERS.length;
+    let j; do { j = Math.floor(Math.random()*WALLPAPERS.length); } while(j===i); return j;
+  },
+  current(){
+    const s = state;
+    if(!s.cfg.wallpaper || s.wallpaperChoice==="none") return null;
+    return WALLPAPERS[s.wallIndex] || null;
+  },
+  rotating(){ return state.cfg.wallpaper && state.wallpaperChoice===null && state.cfg.wallpaper_rotation_minutes>0; },
+  describe(){
+    const s = state;
+    if(!s.cfg.wallpaper || s.wallpaperChoice==="none") return "None";
+    if(s.wallpaperChoice) return WALLPAPERS[s.wallIndex].caption;
+    return "dotfiles · "+WALLPAPERS.length+" pictures";
+  }
+};
+
+/* ═════════════════════════════════════════════════════════════════════════
+   5. VIEWS — build dssoca markup once, then sync() applies state
+   ═════════════════════════════════════════════════════════════════════════ */
+const $ = (sel, root=document) => root.querySelector(sel);
+const h = (html) => { const t=document.createElement("template"); t.innerHTML=html.trim(); return t.content.firstElementChild; };
+const tv = $("#tv"), screenEl = $("#screen");
+
+tv.innerHTML = `
+  <div class="layer-fill tv-wall" id="wallA"></div><div class="layer-fill tv-wall" id="wallB"></div>
+  <div class="layer-fill tv-wallscrim" id="wallScrim"></div>
+  <div class="layer-fill tv-grid-bg"></div>
+  <div class="home layer-fill" id="home">
+    <div class="layer-fill tv-glow" id="glowA"></div><div class="layer-fill tv-glow" id="glowB"></div>
+    <div class="tv-hero" id="hero">
+      <h2 class="ss-heading accent" data-size-variant="lg"><span class="txt" id="heroName"></span></h2>
+    </div>
+    <div class="tv-header">
+      <div>
+        <div class="tv-clockrow"><div class="tv-clock" id="clock"></div><div class="tv-ampm" id="ampm"></div><div class="tv-rule"></div><div class="tv-datecol"><div class="tv-date" id="date"></div><div class="tv-info" id="info"></div></div></div>
+      </div>
+      <div class="tv-right"><div class="tv-pills" id="top"></div><div class="tv-caption" id="caption"></div></div>
+    </div>
+    <div class="layer-fill tv-grid"><div class="tv-content" id="content"></div></div>
+    <div class="tv-frame" id="frame"></div>
+  </div>
+  <div id="overlay"></div>
+  <div class="ss-toaster tv-toaster" id="toaster" role="region" aria-label="Notifications" data-position="bottom-center" data-size-variant="md"></div>`;
+
+const View = {
+  top(){
+    const box = $("#top"); box.innerHTML = "";
+    TOP.forEach((t,k) => {
+      let el;
+      if(t.card){
+        const a = CATALOG[t.id];
+        el = h('<div class="tv-wid" role="button" aria-label="'+a.label+'" data-top="'+k+'"><span class="wv" data-mod="'+t.id+'">'+a.module.value()+'</span>'
+          +'<span class="wk"><span><i style="background:'+a.color+'"></i>'+a.module.key+'</span><span data-modsub="'+t.id+'">'+a.module.sub()+'</span></span></div>');
+      } else {
+        el = h('<button class="ss-btn secondary icon-only" type="button" tabindex="-1" data-top="'+k+'" aria-label="'+t.label+'" title="'+t.label+'"><span class="affix" aria-hidden="true">'+svg(t.icon)+'</span></button>');
+      }
+      el.addEventListener("click", () => { dispatch("focusTop", k); Input.press("DPAD_CENTER"); });
+      box.appendChild(el);
+    });
+  },
+  banner(id){
+    const a = CATALOG[id];
+    return '<div class="tv-ban" style="background:'+a.bg+'"><div style="transform:scale(var(--ls))">'+a.logo+'</div></div>';
+  },
+  tiles(enter){
+    const content = $("#content"); content.innerHTML = '<div class="tv-band" id="band"></div>';
+    state.order.forEach((id,i) => {
+      const el = h('<div class="tv-tile" data-id="'+id+'"><div class="in"><div class="tv-card">'+View.banner(id)+'</div><div class="tv-name">'+CATALOG[id].label+'</div></div></div>');
+      el.addEventListener("click", () => { dispatch("focusTile", state.order.indexOf(id)); Input.press("DPAD_CENTER"); });
+      if(enter && state.cfg.animations && !state.cfg.reduced_motion){ el.classList.add("enter"); el.style.animationDelay = (i*25)+"ms"; }
+      content.appendChild(el);
+    });
+    View.placeTiles(false);
+  },
+  placeTiles(animate){
+    const w = Layout.tileW(), hgt = Layout.tileH();
+    state.order.forEach((id,i) => {
+      const el = $('.tv-tile[data-id="'+id+'"]'), q = Layout.cell(i);
+      el.style.width = w+"px"; el.style.height = hgt+"px";
+      el.style.transition = animate && state.cfg.animations ? "transform var(--ss-dur) var(--ss-ease)" : "none";
+      el.style.transform = "translate("+q.x+"px,"+q.y+"px)";
+      el.style.setProperty("--ls", w/180);
+      el.style.setProperty("--tv-focus-scale", Layout.focusScale());
+    });
+    const a = Layout.cell(0), b = Layout.cell(Math.min(state.cfg.columns, state.order.length)-1), side = Math.min(22, a.x-57);
+    Object.assign($("#band").style, {left:(a.x-side)+"px", top:(a.y-14)+"px", width:(b.x+w-a.x+2*side)+"px", height:(hgt+28)+"px"});
+  },
+  /* dssoca Menu: .ss-menu > .panel.open > button.item(.lead .label [.ss-badge] .marker) */
+  menu(){
+    const m = state.menu, ov = $("#overlay");
+    ov.querySelector(".tv-menu")?.remove();
+    if(!m) return;
+    const anchor = typeof m.anchor==="function" ? m.anchor() : m.anchor;
+    const tr = tv.getBoundingClientRect(), r = anchor.getBoundingClientRect(), sc = tr.width/960;
+    const el = h('<div class="ss-menu tv-menu'+(m.items.length>8?' tall':'')+'" data-size-variant="md" data-side="bottom" data-align="end"><div class="panel open" role="menu" aria-label="'+m.kind+'"></div></div>');
+    el.style.right = (960-(r.right-tr.left)/sc)+"px";
+    el.style.top = ((r.top-tr.top)/sc)+"px"; el.style.height = (r.height/sc)+"px";
+    const panel = el.querySelector(".panel");
+    const selectable = m.items.some(i => i.selected !== undefined);
+    m.items.forEach((it,k) => {
+      if(it.sep){ panel.appendChild(h('<div class="rule" role="separator"></div>')); return; }
+      const lead = it.thumb ? '<span class="lead swatch" aria-hidden="true" style="background-image:url(\''+it.thumb+'\')"></span>' : '<span class="lead" aria-hidden="true">'+svg(it.icon)+'</span>';
+      const b = h('<button type="button" class="item'+(it.selected?' selected':'')+'" role="'+(selectable?'menuitemradio':'menuitem')+'"'+(selectable?' aria-checked="'+!!it.selected+'"':'')+' tabindex="-1">'+lead
+        +'<span class="label">'+it.label+'</span>'
+        +(it.badge?'<span class="ss-badge '+it.badge.tone+'" data-size-variant="sm"><span class="dot" aria-hidden="true"></span>'+it.badge.text+'</span>':'')
+        +(selectable?'<span class="marker" aria-hidden="true">'+(it.selected?svg("check"):'')+'</span>':'')+'</button>');
+      b.addEventListener("click", () => { state.menu.sel = k; Input.press("DPAD_CENTER"); });
+      panel.appendChild(b); it.el = b;
+    });
+    ov.appendChild(el);
+  },
+  /* Launcher settings: dssoca Card + Segmented / Switch / Button, rows from the SHEET schema */
+  sheet(){
+    const ov = $("#overlay"); ov.querySelector(".tv-sheet")?.remove();
+    if(!state.sheet) return;
+    const c = state.cfg;
+    const seg = r => '<div class="ss-segmented" role="radiogroup" aria-label="'+r.label+'" data-size-variant="md">'+r.opts.map(o => { const on = o==c[r.key];
+      return '<button type="button" class="segment'+(on?' selected':'')+'" role="radio" aria-checked="'+on+'" tabindex="-1"><span class="label">'+(r.fmt?r.fmt(o):o)+'</span></button>'; }).join("")+'</div>';
+    const sw = r => '<span class="ss-switch" data-size-variant="md"><button type="button" role="switch" class="track'+(c[r.key]?' on':'')+'" aria-checked="'+!!c[r.key]+'" aria-label="'+r.label+'" tabindex="-1"><span class="thumb" aria-hidden="true"></span></button></span>';
+    const pick = () => { const w = Wallpapers.current();
+      return '<span class="pickv">'+(w?'<span class="thumb" style="background-image:url(\''+w.src+'\')"></span>':'')+'<span>'+Wallpapers.describe()+' ›</span></span>'; };
+    let html = '<div class="col">';
+    SHEET.forEach(r => {
+      if(r.break){ html += '</div><div class="col">'; return; }
+      if(r.group){ html += '<div class="group">'+r.group+'</div>'; return; }
+      if(r.type==="info"){ const src = WALLPAPER_SOURCE; html += '<div class="srcline">'+svg("rotate")+'<span>'+src.repo+' / '+src.path+'</span><span class="ss-badge neutral" data-size-variant="sm">'+src.snapshot+'</span></div>'; return; }
+      if(r.type==="acts"){ html += '</div><div class="acts"><button type="button" class="ss-btn secondary" tabindex="-1"><span class="label">Follow theme</span></button><button type="button" class="ss-btn ghost" tabindex="-1"><span class="label">Choose default home</span></button></div>'; return; }
+      const ctrl = r.type==="seg" ? seg(r) : r.type==="sw" ? sw(r) : pick();
+      html += '<div class="srow'+(r.type==="pick"?' pick':'')+'" data-row="'+r.key+'"><div class="slab"><span>'+r.label+'</span><span>'+r.key+'</span></div>'+ctrl+'</div>';
+    });
+    const el = h('<div class="ss-card tv-sheet" data-size-variant="md">'
+      +'<div class="head"><div class="heading"><div class="title" role="heading" aria-level="2">Launcher settings</div></div><div class="actions"><div class="meta">esc to close</div></div></div>'
+      +'<div class="body"><div class="rows">'+html+'</div></div></div>');
+    ov.appendChild(el);
+  },
+  screen(){
+    const ov = $("#overlay"); ov.querySelector(".tv-screen")?.remove();
+    const sc = state.screen; if(!sc) return;
+    ov.appendChild(h('<div class="tv-screen">'+(sc.art||"")
+      +'<h2 class="ss-heading accent" data-size-variant="lg"><span class="txt">'+sc.title+'</span></h2>'
+      +'<div class="sub">'+sc.sub+'</div>'
+      +'<div class="foot"><kbd class="ss-kbd" data-hide-on-mobile="false"><kbd class="key">esc</kbd></kbd><span>back to home</span></div></div>'));
+  },
+  toast(msg, kind="info"){
+    const t = $("#toaster"); t.innerHTML = "";
+    const el = h('<div class="ss-toast '+kind+'" role="status" aria-live="polite"><span class="ic" aria-hidden="true">'+(kind==="success"?"✓":"i")+'</span><span class="msg">'+msg+'</span></div>');
+    t.appendChild(el); clearTimeout(View.toast.t); View.toast.t = setTimeout(() => el.remove(), 3200);
+  }
+};
+
+/* Launcher settings rows: one schema drives both the view and the D-pad handler */
+const SHEET = [
+  {group:"Layout"},
+  {type:"seg", key:"columns", label:"Apps per row", opts:[4,5,6]},
+  {group:"Wallpaper"},
+  {type:"info"},
+  {type:"pick", key:"wallpaper", label:"Picture"},
+  {type:"seg", key:"wallpaper_order", label:"Order", opts:["shuffle","sequential"]},
+  {type:"seg", key:"wallpaper_rotation_minutes", label:"Change every", opts:[0,1,30,60], fmt:v => v ? v+" min" : "never"},
+  {break:true},
+  {group:"Motion"},
+  {type:"sw", key:"animations", label:"Animations"},
+  {type:"sw", key:"advanced_effects", label:"Advanced effects"},
+  {type:"sw", key:"focus_overshoot", label:"Focus overshoot"},
+  {type:"sw", key:"ambient_glow", label:"App glow"},
+  {type:"acts"}
+];
+const SHEET_ROWS = SHEET.filter(r => !r.group && !r.break && r.type!=="info");
+
+/* sync(): apply state to the built DOM (cheap; runs after every dispatch) */
+function sync(action){
+  const s = state, id = s.order[s.tile], q = Layout.cell(s.tile), dock = s.zone==="tiles" && q.row===0;
+  document.querySelectorAll("#top [data-top]").forEach(el => {
+    const k = +el.dataset.top, t = TOP[k];
+    const open = s.menu && s.menu.back!=="sheet" && ((s.menu.kind==="inputs" && t.id==="inputs") || (s.menu.kind!=="inputs" && t.id==="settings"));
+    const f = (s.zone==="top" && k===s.top) || open;
+    if(t.card){ el.classList.toggle("is-focus", f); return; }
+    el.classList.toggle("primary", f); el.classList.toggle("secondary", !f);
+    el.classList.toggle("is-armed", s.reorder && t.id==="settings");
+  });
+  document.querySelectorAll(".tv-tile").forEach(el => {
+    const f = s.zone==="tiles" && el.dataset.id===id, row = Layout.cell(s.order.indexOf(el.dataset.id)).row;
+    el.classList.toggle("is-focus", f);
+    el.classList.toggle("overshoot", f && s.cfg.focus_overshoot && !s.cfg.reduced_motion);
+    el.classList.toggle("lift", f && s.cfg.advanced_effects && s.cfg.animations);
+    el.classList.toggle("is-picked", f && s.picked);
+    el.querySelector(".tv-name").classList.toggle("on", row>0);
+  });
+  const content = $("#content");
+  content.style.transition = s.cfg.animations && !s.cfg.reduced_motion ? "transform var(--ss-dur-slow) var(--ss-ease)" : "none";
+  content.style.transform = "translateY("+(-s.scroll)+"px)";
+  // focus frame + glow
+  if(s.zone==="tiles"){
+    const sc = s.picked ? 1.16 : Layout.focusScale(), w=q.w*sc, hh=q.h*sc;
+    Motion.target(q.x+q.w/2-w/2, q.y-s.scroll+q.h/2-hh/2, w, hh);
+    Motion.show(true); $("#frame").classList.toggle("reorder", s.reorder);
+    Glow.set(s.cfg.ambient_glow ? CATALOG[id].color : null);
+  } else {
+    Motion.show(false);
+    if(s.zone==="top" && TOP[s.top].card) Glow.set(s.cfg.ambient_glow ? CATALOG[TOP[s.top].id].color : null);
+  }
+  // hero shelf
+  const hero = $("#hero"), showHero = dock && !s.reorder && s.cfg.dock_title;
+  if(showHero){
+    const name = CATALOG[id].label;
+    if($("#heroName").textContent !== name){ $("#heroName").textContent = name;
+      if(s.cfg.animations && !s.cfg.reduced_motion) hero.animate([{opacity:0,transform:"translateY(4px)"},{opacity:1,transform:"none"}],{duration:180,easing:"cubic-bezier(.215,.61,.355,1)"}); }
+    hero.style.bottom = (540 - (Layout.dockTop()-14) + 26)+"px";
+  }
+  hero.style.opacity = showHero ? 1 : 0;
+  // overlays
+  if(["openMenu","closeMenu","openSheet","closeSheet","openScreen","closeScreen","home","reorder","chooseWallpaper","setCfg","resetCfg"].includes(action)){ View.sheet(); View.menu(); View.screen(); }
+  if(s.menu){ s.menu.items.forEach((it,k) => it.el && it.el.classList.toggle("is-focus", k===s.menu.sel));
+    const f = s.menu.items[s.menu.sel].el, panel = f && f.parentElement;   // keep the focused row inside a scrolling panel
+    if(f && panel.scrollHeight > panel.clientHeight){
+      if(f.offsetTop < panel.scrollTop) panel.scrollTop = f.offsetTop - 6;
+      else if(f.offsetTop + f.offsetHeight > panel.scrollTop + panel.clientHeight) panel.scrollTop = f.offsetTop + f.offsetHeight - panel.clientHeight + 6; } }
+  if(s.sheet) syncSheet();
+  // wallpaper + caption (wallpaper_captions)
+  const w = Wallpapers.current();
+  Wall.set(w ? w.src : null);
+  $("#caption").textContent = w && s.cfg.wallpaper_captions ? w.caption : "";
+}
+function syncSheet(){
+  const el = $(".tv-sheet"); if(!el) return;
+  el.querySelectorAll(".is-focus").forEach(n => n.classList.remove("is-focus"));
+  const r = SHEET_ROWS[state.sheet.row];
+  if(r.type==="acts") el.querySelectorAll(".acts .ss-btn")[state.sheet.col].classList.add("is-focus");
+  else {
+    const row = el.querySelector('[data-row="'+r.key+'"]');
+    if(r.type==="seg") row.querySelectorAll(".segment")[state.sheet.col].classList.add("is-focus");
+    else if(r.type==="sw") row.querySelector(".track").classList.add("is-focus");
+    else row.classList.add("is-focus");
+  }
+}
+function ago(t){ const s=(Date.now()-t)/1000; if(s<60) return "just now"; const m=Math.round(s/60); return m+" min ago"; }
+
+/* ═════════════════════════════════════════════════════════════════════════
+   6. FOCUS ENGINE — one handler per zone; keys are Android key names
+   ═════════════════════════════════════════════════════════════════════════ */
+const DIR = {DPAD_UP:"up", DPAD_DOWN:"down", DPAD_LEFT:"left", DPAD_RIGHT:"right"};
+const Zones = {
+  tiles(key){
+    if(DIR[key]){ dispatch("moveTile", DIR[key]); if(state.picked) View.placeTiles(true); return; }
+    if(state.reorder){
+      if(key==="DPAD_CENTER") dispatch("pick", !state.picked);
+      if(key==="BACK"){ if(state.picked) dispatch("pick", false); else { dispatch("reorder", false); View.toast("Order saved","success"); } }
+      return;
+    }
+    const id = state.order[state.tile];
+    if(key==="DPAD_CENTER") return Actions.launch(id);
+    if(key==="LONG_CENTER") return Actions.screen("App info", CATALOG[id].label+" · the TV's app info page opens here.");
+    if(key==="BACK" && Layout.cell(state.tile).row>0) dispatch("focusTile", Layout.cell(state.tile).col);
+  },
+  top(key){
+    const t = TOP[state.top];
+    if(key==="DPAD_LEFT") return dispatch("focusTop", Math.max(0, state.top-1));
+    if(key==="DPAD_RIGHT") return dispatch("focusTop", Math.min(TOP.length-1, state.top+1));
+    if(key==="DPAD_DOWN" || key==="BACK") return dispatch("focusTile", state.dockReturn);
+    if(key==="DPAD_CENTER"){
+      if(t.card) return Actions.launch(t.id);
+      if(t.id==="inputs") return Actions.inputs();
+      if(t.id==="wifi") return Actions.screen("Wi-Fi","The TV's own network settings open here. Holding OK opens them too.");
+      return Actions.screen("Settings","The TV's own Settings app opens here. The launcher writes no system settings itself.");
+    }
+    if(key==="LONG_CENTER") return t.id==="settings" ? Actions.launcherMenu() : Zones.top("DPAD_CENTER");
+  },
+  menu(key){
+    const m = state.menu;
+    if(key==="DPAD_DOWN") return dispatch("menuMove", 1);
+    if(key==="DPAD_UP") return dispatch("menuMove", -1);
+    if(key==="BACK" || key==="DPAD_LEFT") return dispatch("closeMenu");
+    if(key==="DPAD_CENTER" || key==="LONG_CENTER") return m.items[m.sel].act();
+  },
+  sheet(key){
+    const sh = state.sheet, last = SHEET_ROWS.length-1, colOf = r => r.type==="seg" ? Math.max(0, r.opts.indexOf(state.cfg[r.key])) : 0;
+    if(key==="BACK") return dispatch("closeSheet");
+    if(key==="DPAD_DOWN" || key==="DPAD_UP"){ sh.row = Math.max(0, Math.min(last, sh.row+(key==="DPAD_DOWN"?1:-1))); sh.col = colOf(SHEET_ROWS[sh.row]); return syncSheet(); }
+    const r = SHEET_ROWS[sh.row];
+    if(key==="DPAD_LEFT" || key==="DPAD_RIGHT"){
+      const max = r.type==="seg" ? r.opts.length-1 : r.type==="acts" ? 1 : 0;
+      sh.col = Math.max(0, Math.min(max, sh.col+(key==="DPAD_RIGHT"?1:-1))); return syncSheet();
+    }
+    if(key!=="DPAD_CENTER") return;
+    if(r.type==="seg"){ const v = r.opts[sh.col]; dispatch("setCfg", {[r.key]: v}); if(r.key==="columns") View.tiles(true);
+      if(r.key==="wallpaper_rotation_minutes") View.toast(v ? "A new picture every "+v+" min" : "Rotation off: the current picture stays"); }
+    else if(r.type==="sw"){ dispatch("setCfg", {[r.key]: !state.cfg[r.key]}); View.placeTiles(false); }
+    else if(r.type==="pick") Actions.wallpaperPicker();
+    else if(sh.col===0){ dispatch("resetCfg"); View.tiles(true); View.toast("Back to the theme's settings","success"); }
+    else View.toast("This launcher is Home. Choosing the original home hands Home back to it.");
+  },
+  screen(key){ if(key==="BACK") Actions.closeScreen(); }
+};
+
+const Actions = {
+  launch(id){
+    dispatch("launch", id);
+    const a = CATALOG[id];
+    const art = a.module
+      ? '<div class="art tv-wid" style="height:auto;padding:22px 28px;gap:18px;cursor:default"><span class="wv" style="font-size:64px">'+a.module.value()+'</span><span class="wk"><span><i style="background:'+a.color+'"></i>'+a.module.key+'</span><span>'+a.module.sub()+'</span></span></div>'
+      : '<div class="art" style="background:'+a.bg+'"><div style="transform:scale(1.4)">'+a.logo+'</div></div>';
+    Actions.screen(a.label, a.label+" would open here. On the TV this is the app's own activity.", art);
+  },
+  screen(title, sub, art){
+    const home = $("#home"), anim = state.cfg.animations && !state.cfg.reduced_motion;
+    if(anim){ home.classList.remove("back"); home.classList.add("away"); }
+    setTimeout(() => dispatch("openScreen", {title, sub, art}), anim ? 180 : 0);
+  },
+  closeScreen(){
+    const home = $("#home"); home.classList.remove("away");
+    if(state.cfg.animations && !state.cfg.reduced_motion){ home.classList.remove("back"); void home.offsetWidth; home.classList.add("back"); }
+    dispatch("closeScreen");
+  },
+  topAnchor(id){ return () => $('#top [data-top="'+TOP_INDEX[id]+'"]'); },
+  inputs(){
+    const items = INPUTS.map(i => i.sep ? {sep:true} : {
+      label:i.label, icon:i.icon||"input", badge:i.device?{tone:"positive", text:"connected"}:null,
+      act:() => Actions.screen(i.label, i.device ? i.device+" · signal from the connected device." : i.id==="LIVE" ? "The TV's tuner app opens here." : "No signal on "+i.label+".")
+    });
+    dispatch("openMenu", {kind:"inputs", items, anchor:Actions.topAnchor("inputs")});
+  },
+  launcherMenu(){
+    dispatch("openMenu", {kind:"launcher", anchor:Actions.topAnchor("settings"), items:[
+      {label:"Launcher settings", icon:"home", act:() => dispatch("openSheet")},
+      {label:"Module cards", icon:"card", act:() => { dispatch("closeMenu"); View.toast("weather: shown · world clock: shown"); }},
+      {label:"Reorder apps", icon:"swap", act:() => { dispatch("reorder", true); View.toast("OK picks up an app, arrows move it, Back places it. Back again to finish."); }}
+    ]});
+  },
+  quickPanel(){
+    if(state.zone==="screen") Actions.closeScreen();
+    if(state.zone==="sheet") dispatch("closeSheet");
+    dispatch("openMenu", {kind:"quick", anchor:Actions.topAnchor("settings"), items:[
+      {label:"TV system settings", icon:"settings", act:() => Actions.screen("Settings","The TV's own Settings app opens here.")},
+      {label:"Display", icon:"picture", act:() => Actions.screen("Display","The TV's display settings open here.")},
+      {label:"Network", icon:"wifi", act:() => Actions.screen("Network","The TV's network settings open here.")},
+      {label:"Apps", icon:"apps", badge:{tone:"neutral", text:"re-enable"}, act:() => Actions.screen("Apps","Re-enable a disabled app from the TV's app list.")},
+      {label:"Launcher settings", icon:"home", act:() => dispatch("openSheet")}
+    ]});
+  },
+  /* LauncherSettingsActivity.showWallpaperPicker: one picture from the collection, None, or Theme default */
+  wallpaperPicker(){
+    const ch = state.wallpaperChoice;
+    const done = (v, msg) => { dispatch("chooseWallpaper", v); dispatch("closeMenu"); View.toast(msg, "success"); };
+    const items = [
+      {label:"Rotate the folder ("+WALLPAPERS.length+")", icon:"rotate", selected: ch===null, act:() => done(null, "Rotating the collection again")},
+      {sep:true},
+      ...WALLPAPERS.map(w => ({label:w.caption, thumb:w.src, selected: ch===w.file, act:() => done(w.file, "Wallpaper changed. Rotation stops until you choose Theme default")})),
+      {sep:true},
+      {label:"None", icon:"none", selected: ch==="none", act:() => done("none", "No wallpaper")}
+    ];
+    const sel = items.findIndex(i => i.selected);
+    dispatch("openMenu", {kind:"wallpaper", items, sel, anchor:() => $('.tv-sheet [data-row="wallpaper"] .pickv')});
+  }
+};
+
+/* ═════════════════════════════════════════════════════════════════════════
+   7. MOTION — focus frame spring (MainActivity stiffness / damping) + glow
+   ═════════════════════════════════════════════════════════════════════════ */
+const Motion = (() => {
+  const frame = $("#frame"), S = {x:{p:0,v:0,t:0}, y:{p:0,v:0,t:0}, w:{p:0,v:0,t:0}, h:{p:0,v:0,t:0}};
+  let raf = 0, shown = false, last = 0, k = 260, z = .58;
+  const draw = () => { frame.style.width=S.w.p+"px"; frame.style.height=S.h.p+"px"; frame.style.transform="translate("+S.x.p+"px,"+S.y.p+"px)"; };
+  function step(ts){
+    const dt = Math.min(.032, last ? (ts-last)/1000 : .016); last = ts;
+    const c = 2*z*Math.sqrt(k); let moving = false;
+    for(let i=0;i<2;i++) for(const n in S){ const s=S[n]; s.v += (-k*(s.p-s.t) - c*s.v)*dt/2; s.p += s.v*dt/2; }
+    for(const n in S){ const s=S[n]; if(Math.abs(s.p-s.t)>.05 || Math.abs(s.v)>.05) moving = true; else { s.p=s.t; s.v=0; } }
+    draw(); raf = moving ? requestAnimationFrame(step) : 0; if(!moving) last = 0;
+  }
+  return {
+    target(x,y,w,hh){ ({k,z} = Layout.spring()); const t={x,y,w,h:hh};
+      for(const n in S){ S[n].t=t[n]; if(!shown || !state.cfg.animations){ S[n].p=t[n]; S[n].v=0; } }
+      draw(); if(!raf) raf = requestAnimationFrame(step); },
+    show(on){ shown = on; frame.style.opacity = on ? 1 : 0; }
+  };
+})();
+
+const Glow = (() => {
+  let front = "A", color = undefined, timer = 0;
+  const css = c => "radial-gradient(circle 595px at 32% 42%, color-mix(in srgb,"+c+" var(--tv-glow-a),transparent), color-mix(in srgb,"+c+" var(--tv-glow-b),transparent) 45%, transparent 100%)";
+  return { set(c){
+    if(c===color) return; const first = color===undefined; color = c;
+    const A=$("#glow"+front), B=$("#glow"+(front==="A"?"B":"A"));
+    if(!c){ A.style.opacity=0; B.style.opacity=0; return; }
+    const anim = state.cfg.animations && !state.cfg.reduced_motion;
+    if(!anim || first){ A.style.transition = anim?"opacity 600ms":"none"; A.style.background=css(c); A.style.opacity=1; return; }
+    if(state.cfg.advanced_effects){ B.style.background=css(c); A.style.transition=B.style.transition="opacity 500ms"; B.style.opacity=1; A.style.opacity=0; front = front==="A"?"B":"A"; return; }
+    A.style.transition="opacity 200ms"; A.style.opacity=.35; clearTimeout(timer);
+    timer = setTimeout(() => { A.style.background=css(color); A.style.transition="opacity 500ms"; A.style.opacity=1; }, 200);
+  }};
+})();
+
+const Wall = (() => {
+  let front="A", current;
+  return { set(src){
+    if(src===current) return; current=src;
+    const F=$("#wall"+front), B=$("#wall"+(front==="A"?"B":"A"));
+    $("#wallScrim").classList.toggle("on", !!src);
+    if(!src){ F.classList.remove("on"); B.classList.remove("on"); return; }
+    B.style.backgroundImage="url('"+src+"')"; B.classList.add("on"); F.classList.remove("on"); front = front==="A"?"B":"A";
+  }};
+})();
+
+/* ═════════════════════════════════════════════════════════════════════════
+   8. INPUT — keyboard + on-screen remote → Android key names
+   ═════════════════════════════════════════════════════════════════════════ */
+const Input = {
+  press(key){
+    if(key==="HOME"){ $("#home").classList.remove("away"); dispatch("home"); return; }
+    if(key==="SETTINGS") return Actions.quickPanel();
+    Zones[state.zone](key);
+  }
+};
+const KEYMAP = {ArrowUp:"DPAD_UP", ArrowDown:"DPAD_DOWN", ArrowLeft:"DPAD_LEFT", ArrowRight:"DPAD_RIGHT", Escape:"BACK", Backspace:"BACK", h:"HOME", H:"HOME", s:"SETTINGS", S:"SETTINGS"};
+let okTimer = null, okLong = false;
+const okDown = () => { if(okTimer) return; okLong=false; okTimer = setTimeout(() => { okLong=true; Input.press("LONG_CENTER"); }, 500); };
+const okUp = () => { if(!okTimer) return; clearTimeout(okTimer); okTimer=null; if(!okLong) Input.press("DPAD_CENTER"); };
+document.addEventListener("keydown", e => {
+  const inChrome = e.target.closest && e.target.closest(".deck button");
+  if(e.key==="Enter"){ if(inChrome) return; e.preventDefault(); if(!e.repeat) okDown(); return; }
+  const k = KEYMAP[e.key]; if(!k) return;
+  if(inChrome && !k.startsWith("DPAD")) return;
+  e.preventDefault(); Input.press(k);
+});
+document.addEventListener("keyup", e => { if(e.key==="Enter") okUp(); });
+document.querySelectorAll(".remote [data-k]").forEach(b => b.addEventListener("click", () => { Input.press(b.dataset.k); screenEl.focus({preventScroll:true}); }));
+const okKey = $("#okKey");
+okKey.addEventListener("pointerdown", e => { e.preventDefault(); okDown(); });
+["pointerup","pointerleave","pointercancel"].forEach(ev => okKey.addEventListener(ev, okUp));
+okKey.addEventListener("keydown", e => { if(e.key===" "){ e.preventDefault(); if(!e.repeat) okDown(); } });
+okKey.addEventListener("keyup", e => { if(e.key===" ") okUp(); });
+screenEl.addEventListener("pointerdown", () => screenEl.focus({preventScroll:true}));
+
+/* ═════════════════════════════════════════════════════════════════════════
+   9. CLOCK, ROTATION + BOOT
+   ═════════════════════════════════════════════════════════════════════════ */
+const DAYS=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+const MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+function tick(){
+  const d = new Date(), hr = d.getHours();
+  $("#clock").textContent = ((hr%12)||12)+":"+String(d.getMinutes()).padStart(2,"0");
+  $("#ampm").textContent = hr<12 ? "AM" : "PM";
+  $("#date").textContent = DAYS[d.getDay()]+"  "+d.getDate()+" "+MONTHS[d.getMonth()];
+  Info.render();
+  if(Wallpapers.rotating() && Date.now()-state.wallSince >= state.cfg.wallpaper_rotation_minutes*60000) dispatch("nextWallpaper");
+}
+function fit(){ tv.style.transform = "scale("+(screenEl.clientWidth/960)+")"; }
+new ResizeObserver(fit).observe(screenEl); fit();
+
+listeners.push(sync);
+state.wallIndex = Wallpapers.next(-1, CONFIG.wallpaper_order==="sequential" ? "sequential" : "shuffle");
+if(CONFIG.wallpaper_order==="sequential") state.wallIndex = 0;
+View.top(); View.tiles(true); tick(); setInterval(tick, 1000);
+sync("home");
+setTimeout(() => screenEl.focus({preventScroll:true}), 60);
+})();
+</script>

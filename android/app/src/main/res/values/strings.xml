@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">TV Home</string>
+    <string name="inputs">Inputs</string>
+    <string name="wifi">Wi-Fi</string>
+    <string name="settings">Settings</string>
+    <string name="live_tv">Live TV</string>
+    <string name="connected">connected</string>
+    <string name="tv_settings">TV system settings</string>
+    <string name="display">Display</string>
+    <string name="network">Network</string>
+    <string name="apps">Apps</string>
+    <string name="reenable">re-enable</string>
+    <string name="launcher_settings">Launcher settings</string>
+    <string name="reorder">Reorder apps</string>
+    <string name="reorder_hint">OK picks up an app, arrows move it, Back places it. Back again to finish.</string>
+    <string name="order_saved">Order saved</string>
+    <string name="esc_to_close">back to close</string>
+    <string name="group_layout">Layout</string>
+    <string name="group_wallpaper">Wallpaper</string>
+    <string name="group_motion">Motion</string>
+    <string name="apps_per_row">Apps per row</string>
+    <string name="picture">Picture</string>
+    <string name="order">Order</string>
+    <string name="change_every">Change every</string>
+    <string name="never">never</string>
+    <string name="minutes">%1$d min</string>
+    <string name="animations">Animations</string>
+    <string name="advanced_effects">Advanced effects</string>
+    <string name="focus_overshoot">Focus overshoot</string>
+    <string name="app_glow">App glow</string>
+    <string name="follow_config">Follow config</string>
+    <string name="default_home">Choose default home</string>
+    <string name="rotate_folder">Rotate the folder (%1$d)</string>
+    <string name="wallpaper_none">None</string>
+    <string name="wallpaper_folder">%1$s · %2$d pictures</string>
+    <string name="wallpaper_empty">No pictures yet</string>
+    <string name="wallpaper_changed">Wallpaper changed. Rotation stops until you choose Rotate</string>
+    <string name="wallpaper_rotating">Rotating the folder again</string>
+    <string name="rotation_every">A new picture every %1$d min</string>
+    <string name="rotation_off">Rotation off: the current picture stays</string>
+    <string name="back_to_config">Back to the config\'s settings</string>
+    <string name="synced">Wallpapers synced: %1$d new, %2$d removed</string>
+    <string name="cant_open">Can\'t open %1$s</string>
+    <string name="no_inputs">No inputs on this TV</string>
+</resources>

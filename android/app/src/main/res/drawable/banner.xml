@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 320x180 leanback banner: dssoca near-black, a square screen glyph and the accent underline. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android" android:width="320dp" android:height="180dp" android:viewportWidth="320" android:viewportHeight="180">
+    <path android:fillColor="#FF100F10" android:pathData="M0,0h320v180h-320z" />
+    <path android:fillColor="#1FFAFDFA" android:pathData="M0,0h320v1h-320zM0,179h320v1h-320z" />
+    <path android:fillColor="#FFFAFDFA" android:pathData="M110,52h100v58h-100zM116,58v46h88v-46z" />
+    <path android:fillColor="#FF66EF73" android:pathData="M100,122h120v10h-120z" />
+</vector>

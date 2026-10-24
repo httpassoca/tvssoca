@@ -1,0 +1,46 @@
+plugins {
+    id "com.android.application"
+}
+
+android {
+    namespace "dev.passoca.tvhome"
+    compileSdk 35
+
+    defaultConfig {
+        applicationId "dev.passoca.tvhome"
+        minSdk 26          // same floor as the CleanYourTV launcher
+        targetSdk 35
+        versionCode 1
+        versionName "0.1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled true
+            shrinkResources true
+            proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
+            signingConfig signingConfigs.debug   // personal build: sign with this machine's debug key
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    testOptions {
+        unitTests.returnDefaultValues = true
+    }
+
+    lint {
+        abortOnError true
+        warningsAsErrors false
+        disable "MissingTranslation"
+    }
+}
+
+dependencies {
+    // No runtime dependencies: core/ is plain Java, ui/ uses only the Android framework.
+    testImplementation "junit:junit:4.13.2"
+    testImplementation "org.json:json:20240303"   // android.jar's org.json is a stub on the JVM
+}

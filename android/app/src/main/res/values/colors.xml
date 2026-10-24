@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- dssoca 0.19 dark tokens (theme.css), resolved to hex. Elevation mixes are computed in OKLab like the CSS
+     color-mix(); alpha tokens keep their percentage (12% → 1F, 18% → 2E, 22% → 38). -->
+<resources>
+    <color name="ss_bg">#FF100F10</color>
+    <color name="ss_bg_elev">#FF262626</color>
+    <color name="ss_bg_elev_hover">#FF303030</color>
+    <color name="ss_fg">#FFDAE0DA</color>
+    <color name="ss_fg_shine">#FFFAFDFA</color>
+    <color name="ss_fg_muted">#FF9B9E9B</color>
+    <color name="ss_fg_faint">#FF859085</color>
+    <color name="ss_fg_on_primary">#FF100F10</color>
+    <color name="ss_primary">#FF66EF73</color>
+    <color name="ss_primary_soft">#2E66EF73</color>
+    <color name="ss_primary_glow">#5966EF73</color>
+    <color name="ss_line">#1FFAFDFA</color>
+    <color name="ss_line_strong">#38FAFDFA</color>
+    <color name="ss_hover">#0DFAFDFA</color>
+    <color name="ss_red">#FFE18A77</color>
+    <color name="ss_yellow">#FFB6A54E</color>
+    <color name="ss_blue">#FF46B4D6</color>
+    <color name="ss_cyan">#FF46BBA4</color>
+    <color name="ss_badge_positive_bg">#1F66EF73</color>
+    <color name="ss_badge_positive_border">#6666EF73</color>
+    <color name="ss_badge_neutral_bg">#0FFAFDFA</color>
+    <!-- TV-specific: top-bar buttons over a wallpaper (bg at 72%) -->
+    <color name="tv_chrome_bg">#B8100F10</color>
+</resources>
