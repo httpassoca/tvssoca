@@ -16,6 +16,11 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 import dev.passoca.tvhome.R;
 import dev.passoca.tvhome.core.Config;
@@ -45,10 +50,24 @@ public final class AppsRepository {
     /** Installed apps by label, plus a tile for every {@code input:} entry of the dock that the TV has. */
     public static List<App> load(Context ctx, Config cfg) {
         PackageManager pm = ctx.getPackageManager();
-        Map<String, App> apps = new LinkedHashMap<>();
-        collect(ctx, pm, Intent.CATEGORY_LEANBACK_LAUNCHER, cfg.hiddenApps, apps);
-        collect(ctx, pm, Intent.CATEGORY_LAUNCHER, cfg.hiddenApps, apps);
-        List<App> out = new ArrayList<>(apps.values());
+        Map<String, ResolveInfo> found = new LinkedHashMap<>();
+        Map<String, String> categories = new LinkedHashMap<>();
+        collect(ctx, pm, Intent.CATEGORY_LEANBACK_LAUNCHER, cfg.hiddenApps, found, categories);
+        collect(ctx, pm, Intent.CATEGORY_LAUNCHER, cfg.hiddenApps, found, categories);
+        // Banners, labels and colours load on a few threads: one by one this took about 1 s on her TV.
+        List<Callable<App>> jobs = new ArrayList<>();
+        for (Map.Entry<String, ResolveInfo> e : found.entrySet()) jobs.add(() -> app(pm, e.getValue(), categories.get(e.getKey())));
+        List<App> out = new ArrayList<>();
+        ExecutorService pool = Executors.newFixedThreadPool(3);
+        try {
+            for (Future<App> f : pool.invokeAll(jobs)) {
+                try { out.add(f.get()); } catch (ExecutionException ignored) { }   // one broken app must not empty Home
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        } finally {
+            pool.shutdown();
+        }
         out.sort(Comparator.comparing(a -> a.label.toLowerCase(Locale.ROOT)));
         for (String entry : cfg.dockApps) {
             if (!Config.isInput(entry)) continue;
@@ -60,21 +79,29 @@ public final class AppsRepository {
         return out;
     }
 
-    private static void collect(Context ctx, PackageManager pm, String category, List<String> hidden, Map<String, App> into) {
+    /** Launchable activities of one category, first one per package wins. */
+    private static void collect(Context ctx, PackageManager pm, String category, List<String> hidden,
+                                Map<String, ResolveInfo> into, Map<String, String> categories) {
         Intent q = new Intent(Intent.ACTION_MAIN).addCategory(category);
         for (ResolveInfo ri : pm.queryIntentActivities(q, 0)) {
             ActivityInfo ai = ri.activityInfo;
             if (ai == null || into.containsKey(ai.packageName) || ai.packageName.equals(ctx.getPackageName())
                     || hidden.contains(ai.packageName)) continue;
-            Drawable banner = ai.loadBanner(pm);
-            if (banner == null) banner = ai.applicationInfo.loadBanner(pm);
-            Drawable icon = ai.loadIcon(pm);
-            Intent launch = new Intent(Intent.ACTION_MAIN).addCategory(category)
-                    .setClassName(ai.packageName, ai.name)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
-            into.put(ai.packageName, new App(ai.packageName, String.valueOf(ri.loadLabel(pm)), banner, icon,
-                    vivid(banner != null ? banner : icon), launch));
+            into.put(ai.packageName, ri);
+            categories.put(ai.packageName, category);
         }
+    }
+
+    /** One tile: the banner, or the icon only when there is no banner (it is not drawn otherwise). */
+    private static App app(PackageManager pm, ResolveInfo ri, String category) {
+        ActivityInfo ai = ri.activityInfo;
+        Drawable banner = ai.loadBanner(pm);
+        if (banner == null) banner = ai.applicationInfo.loadBanner(pm);
+        Drawable icon = banner == null ? ai.loadIcon(pm) : null;
+        Intent launch = new Intent(Intent.ACTION_MAIN).addCategory(category)
+                .setClassName(ai.packageName, ai.name)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED);
+        return new App(ai.packageName, String.valueOf(ri.loadLabel(pm)), banner, icon, vivid(banner != null ? banner : icon), launch);
     }
 
     /** The most saturated, reasonably bright pixel of a 24 x 14 sample; grey when the art has no colour. */

@@ -32,7 +32,7 @@ body{margin:0;background:var(--ss-bg);color:var(--ss-fg);font-family:var(--ss-fo
 .tv-wall{background-size:cover;background-position:center;opacity:0;transition:opacity var(--ss-dur-xslow) var(--ss-ease)}
 .tv-wall.on{opacity:1}
 /* wallpaper_dim as a vertical scrim (HomeActivity.applyScrim): --dim is set from the config */
-.tv-wallscrim{--dim:.45;background:linear-gradient(to bottom, color-mix(in srgb,var(--ss-bg) calc(var(--dim)*78%),transparent), color-mix(in srgb,var(--ss-bg) min(92%, calc(var(--dim)*122%)),transparent) 50%, color-mix(in srgb,var(--ss-bg) min(92%, calc(var(--dim)*190%)),transparent));opacity:0;transition:opacity var(--ss-dur-slow)}
+.tv-wallscrim{--dim:.45;background:linear-gradient(to bottom, color-mix(in srgb,var(--ss-bg) min(92%, calc(var(--dim)*135%)),transparent), color-mix(in srgb,var(--ss-bg) calc(var(--dim)*70%),transparent) 33%, color-mix(in srgb,var(--ss-bg) min(92%, calc(var(--dim)*122%)),transparent) 66%, color-mix(in srgb,var(--ss-bg) min(92%, calc(var(--dim)*190%)),transparent));opacity:0;transition:opacity var(--ss-dur-slow)}
 .tv-wallscrim.on{opacity:1}
 .tv-grid-bg{background-image:linear-gradient(var(--ss-line) 1px,transparent 1px),linear-gradient(90deg,var(--ss-line) 1px,transparent 1px);
   background-size:48px 48px;background-position:-1px -1px;opacity:.35;
@@ -812,7 +812,7 @@ const Motion = (() => {
     const dt = Math.min(.032, last ? (ts-last)/1000 : .016); last = ts;
     const c = 2*z*Math.sqrt(k); let moving = false;
     for(let i=0;i<2;i++) for(const n in S){ const s=S[n]; s.v += (-k*(s.p-s.t) - c*s.v)*dt/2; s.p += s.v*dt/2; }
-    for(const n in S){ const s=S[n]; if(Math.abs(s.p-s.t)>.05 || Math.abs(s.v)>.05) moving = true; else { s.p=s.t; s.v=0; } }
+    for(const n in S){ const s=S[n]; if(Math.abs(s.p-s.t)>.5 || Math.abs(s.v)>5) moving = true; else { s.p=s.t; s.v=0; } }   // Spring.REST_*
     draw(); raf = moving ? requestAnimationFrame(step) : 0; if(!moving) last = 0;
   }
   return {

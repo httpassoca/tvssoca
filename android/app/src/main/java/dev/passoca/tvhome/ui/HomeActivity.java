@@ -85,7 +85,9 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
     private View toast;
 
     private final Handler main = new Handler(Looper.getMainLooper());
-    private final ExecutorService io = Executors.newSingleThreadExecutor();
+    /** Apps and weather; picture decoding; the GitHub sync. Separate so a slow one never holds up another. */
+    private final ExecutorService io = Executors.newSingleThreadExecutor(),
+            images = Executors.newSingleThreadExecutor(), sync = Executors.newSingleThreadExecutor();
     private WallpaperRepository walls;
     private WeatherRepository weatherRepo;
     private WeatherReading weather;
@@ -144,7 +146,7 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
         }
         tick();
         main.removeCallbacks(ticker);
-        main.postDelayed(ticker, TICK_MS);
+        main.postDelayed(ticker, nextTickDelay());
         syncWallpapersIfDue();
         refreshWeather();
     }
@@ -167,6 +169,8 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
     @Override protected void onDestroy() {
         unregisterReceiver(packages);
         io.shutdownNow();
+        images.shutdownNow();
+        sync.shutdownNow();
         super.onDestroy();
     }
 
@@ -186,8 +190,14 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
     };
 
     private final Runnable ticker = new Runnable() {
-        @Override public void run() { tick(); main.postDelayed(this, TICK_MS); }
+        @Override public void run() { tick(); main.postDelayed(this, nextTickDelay()); }
     };
+
+    /** Every 15 s, but always just after a minute turns, so the clock never shows the old minute. */
+    private static long nextTickDelay() {
+        long toMinute = 60_000L - System.currentTimeMillis() % 60_000L + 50L;
+        return Math.min(TICK_MS, toMinute);
+    }
 
     private Config loadConfig() {
         Config c = prefs.load();
@@ -585,7 +595,7 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
     private void syncWallpapersIfDue() {
         if (System.currentTimeMillis() < nextSyncAt) return;
         nextSyncAt = System.currentTimeMillis() + RETRY_MS;   // one sync at a time
-        io.execute(() -> {
+        sync.execute(() -> {
             WallpaperRepository.Result r = walls.sync(cfg.wallpaperSource);
             main.post(() -> {
                 nextSyncAt = System.currentTimeMillis() + (r.ok ? SYNC_EVERY_MS : RETRY_MS);
@@ -601,7 +611,7 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
 
     private void loadThumbs() {
         List<String> files = new ArrayList<>(wallFiles);
-        io.execute(() -> {
+        images.execute(() -> {
             Map<String, Drawable> out = new HashMap<>();
             for (String f : files) {
                 Bitmap b = walls.decode(f, 96, 54);
@@ -637,7 +647,7 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
         if (file.equals(wallShown)) return;
         wallShown = file;
         int w = getResources().getDisplayMetrics().widthPixels, h = getResources().getDisplayMetrics().heightPixels;
-        io.execute(() -> {
+        images.execute(() -> {
             Bitmap b = walls.decode(file, w, h);
             main.post(() -> {
                 if (!file.equals(wallShown)) return;
@@ -645,17 +655,20 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
                 ImageView in = wallFront ? wallB : wallA, out = wallFront ? wallA : wallB;
                 in.setImageBitmap(b);
                 in.animate().alpha(1f).setDuration(motion() ? 650 : 0).start();
-                out.animate().alpha(0f).setDuration(motion() ? 650 : 0).start();
+                // the outgoing picture's bitmap (8 MB at 1080p) is let go once it has faded
+                out.animate().alpha(0f).setDuration(motion() ? 650 : 0).withEndAction(() -> out.setImageDrawable(null)).start();
                 wallFront = !wallFront;
             });
         });
     }
 
-    /** wallpaper_dim as a vertical scrim: lighter at the top, darkest behind the dock. */
+    /** wallpaper_dim as a vertical scrim: darker behind the header (legible on light pictures), lightest
+     *  across the middle, darkest behind the dock. */
     private void applyScrim(boolean on) {
         float d = cfg.wallpaperDim / 100f;
         GradientDrawable g = new GradientDrawable(GradientDrawable.Orientation.TOP_BOTTOM, new int[]{
-                Dss.withAlpha(dss.bg, d * 0.78f), Dss.withAlpha(dss.bg, Math.min(0.92f, d * 1.22f)), Dss.withAlpha(dss.bg, Math.min(0.92f, d * 1.9f))});
+                Dss.withAlpha(dss.bg, Math.min(0.92f, d * 1.35f)), Dss.withAlpha(dss.bg, d * 0.7f),
+                Dss.withAlpha(dss.bg, Math.min(0.92f, d * 1.22f)), Dss.withAlpha(dss.bg, Math.min(0.92f, d * 1.9f))});
         scrim.setBackground(g);
         scrim.animate().alpha(on ? 1f : 0f).setDuration(350).start();
     }
@@ -782,18 +795,16 @@ public final class HomeActivity extends Activity implements SettingsSheet.Host {
 
     // ─── actions ────────────────────────────────────────────────────────────
 
-    /** Opens another app with the launcher's exit motion (fade to 25%, a 2.5% push in). */
+    /**
+     * Opens another app with the launcher's exit motion (fade to 25%, a 2.5% push in). The app is asked for
+     * at once and the motion plays while it starts, so the motion never adds to the wait for the app.
+     */
     private void launch(Intent intent, String what) {
-        if (motion()) {
-            float s = stageScale();
-            stage.animate().alpha(0.25f).scaleX(1.025f * s).scaleY(1.025f * s).setDuration(200)
-                    .withEndAction(() -> {
-                        if (open(intent, what)) launching = true;
-                        else { stage.setAlpha(1f); stage.setScaleX(s); stage.setScaleY(s); }
-                    }).start();
-        } else {
-            open(intent, what);
-        }
+        if (!open(intent, what)) return;
+        if (!motion()) return;
+        launching = true;
+        float s = stageScale();
+        stage.animate().alpha(0.25f).scaleX(1.025f * s).scaleY(1.025f * s).setDuration(200).start();
     }
 
     private boolean open(Intent intent, String what) {

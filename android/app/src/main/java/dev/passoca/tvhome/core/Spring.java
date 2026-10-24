@@ -8,6 +8,10 @@ package dev.passoca.tvhome.core;
  */
 public final class Spring {
 
+    /** At rest within half a dp (one pixel on a 1080p TV) and below 5 dp/s: the tail after that is invisible,
+     *  and on her TV every extra frame costs a full 4K GPU composite. */
+    public static final float REST_POSITION = 0.5f, REST_VELOCITY = 5f;
+
     public final float stiffness, damping;
 
     public Spring(float stiffness, float damping) { this.stiffness = stiffness; this.damping = damping; }
@@ -33,7 +37,7 @@ public final class Spring {
                 velocity += a * h;
                 position += velocity * h;
             }
-            if (Math.abs(position - target) <= 0.05f && Math.abs(velocity) <= 0.05f) {
+            if (Math.abs(position - target) <= REST_POSITION && Math.abs(velocity) <= REST_VELOCITY) {
                 position = target;
                 velocity = 0f;
                 return false;

@@ -116,7 +116,7 @@ licenses/                MIT (CleanYourTV, dssoca), OFL (Electrolize, JetBrains 
 
 ```bash
 cd android
-./gradlew testDebugUnitTest            # 46 JVM tests for core/
+./gradlew testDebugUnitTest            # 47 JVM tests for core/
 ./gradlew lintDebug                    # 0 errors expected
 ./gradlew assembleDebug                # app/build/outputs/apk/debug/app-debug.apk
 ./gradlew assembleRelease              # minified, signed with this machine's debug key (personal build)
@@ -158,7 +158,7 @@ The remote's Settings key is still taken by the system.
 ## Status (2026-10-24)
 
 Verified in the build sandbox:
-- 46 unit tests pass (config parsing, layout geometry, spring, focus model, wallpaper rotation and
+- 47 unit tests pass (config parsing, layout geometry, spring, focus model, wallpaper rotation and
   sync plan, Open-Meteo parsing and cache ageing, world clock across a DST change).
 - `assembleDebug`, `assembleRelease` and `lintDebug` succeed: 0 errors, 31 warnings. Most warnings are
   dssoca size tokens in `dimens.xml` that the code does not reference yet (it uses dp literals that
@@ -167,6 +167,8 @@ Verified in the build sandbox:
 **Verified on her TV (2026-10-24):** header, dock and grid, input tile, Inputs menu, Help card, Launcher
 settings and the wallpaper picker over it, wallpaper sync from GitHub, panels closed after leaving Home.
 Idle on Home: 1 frame in 20 s, about 0% CPU.
+Performance notes (see important.md): the TV GPU-upscales every app to 4K, so frame count is what matters; keep
+animations short. App list loading is parallel; wallpapers are decoded to screen size; launch never waits on motion.
 
 **Not yet verified:**
 - Long press OK with the real IR remote (adb's `--longpress` releases at 400 ms, before the 500 ms timer).

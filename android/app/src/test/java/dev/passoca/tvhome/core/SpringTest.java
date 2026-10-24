@@ -38,7 +38,7 @@ public class SpringTest {
     @Test public void criticallyDampedNeverOvershoots() {
         float[] max = new float[1];
         settle(new Spring(440f, 1f), 0f, 100f, max);
-        assertTrue(max[0] <= 100.05f);
+        assertTrue(max[0] <= 100f + Spring.REST_POSITION);
     }
 
     @Test public void longFrameIsClamped() {
@@ -47,5 +47,11 @@ public class SpringTest {
         v.target = 100f;
         v.step(new Spring(260f, 0.58f), 5f);   // a 5 s hitch must not explode
         assertTrue(Math.abs(v.position) < 200f);
+    }
+
+    @Test public void focusMoveEndsWithinAboutHalfASecond() {
+        float[] max = new float[1];
+        assertTrue("default spring, one tile (210 dp)", settle(new Spring(260f, 0.58f), 0f, 210f, max) <= 40);
+        assertTrue("advanced effects", settle(new Spring(320f, 0.76f), 0f, 210f, max) <= 30);
     }
 }

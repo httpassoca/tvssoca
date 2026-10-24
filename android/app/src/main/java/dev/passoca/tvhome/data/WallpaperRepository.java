@@ -93,6 +93,13 @@ public final class WallpaperRepository {
         BitmapFactory.Options d = new BitmapFactory.Options();
         d.inSampleSize = sample;
         d.inPreferredConfig = Bitmap.Config.ARGB_8888;
-        return BitmapFactory.decodeFile(f.getPath(), d);
+        Bitmap b = BitmapFactory.decodeFile(f.getPath(), d);
+        if (b == null) return null;
+        // power-of-two sampling can leave a 2560 x 1440 picture at full size: scale it to just cover the screen
+        float k = Math.max((float) targetW / b.getWidth(), (float) targetH / b.getHeight());
+        if (k >= 0.95f) return b;
+        Bitmap scaled = Bitmap.createScaledBitmap(b, Math.round(b.getWidth() * k), Math.round(b.getHeight() * k), true);
+        if (scaled != b) b.recycle();
+        return scaled;
     }
 }
