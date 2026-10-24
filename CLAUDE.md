@@ -5,8 +5,12 @@ still `dev.passoca.tvhome`). Its icon and banner use the passoca.dev logo (githu
 `static/logo.svg`) in signal green. It takes the behaviour and geometry of the
 CleanYourTV launcher (github.com/Gathin23/cleanyourtv, MIT) and redraws it with **dssoca**, her
 design system (github.com/httpassoca/dssoca, npm `dssoca`). Read this file first in every session.
-**`important.md`** (repo root) holds the live state of her TV: what is disabled, how to undo it, the dock and
-the build machine. Keep it current when anything on the TV changes.
+**This repo is public.** Personal and device-specific notes live in two **gitignored** files at the repo root,
+kept only on her machines: `important.md` (the live state of her TV: address, what is disabled and how to undo
+it, usage and performance notes, removed apps, the build machine) and `config.json` (her real launcher config).
+Read `important.md` if it exists; keep it current when anything on the TV changes. Never commit LAN addresses,
+device serials, usage habits, installed-app lists, account details or her real `config.json`;
+`config.example.json` is the public template.
 
 ## Goals (what she asked for, in her words where possible)
 
@@ -19,9 +23,9 @@ the build machine. Keep it current when anything on the TV changes.
    Help opens a card listing the launcher's keys (hold OK on an app or the gear, Back, Home, reorder, where
    `config.json` lives). Inputs lists only the TV's physical ports (HDMI in port order, then AV) and its
    built-in tuner, with a connected / standby badge; apps' channel services (Play Movies, VLC...) are left out.
-4. **Dock:** show **only the app title above the dock and the apps**. Her dock (repo `config.json`):
-   a few apps, and a TV input (a game console on HDMI) as an input tile
-   (`dock_apps` entry `"input:<TvInputInfo id>"`, named through `input_labels`). No "dock 01/04" badge, no
+4. **Dock:** show **only the app title above the dock and the apps**. Her dock lives in the local `config.json`.
+   A dock entry can also be a TV input (`dock_apps` entry `"input:<TvInputInfo id>"`, named through
+   `input_labels`), e.g. a game console on an HDMI port. No "dock 01/04" badge, no
    "last opened" line, no "DOCK" tab. The focus border is plain: **no extra corner marks**.
 5. **Wallpapers from a GitHub folder:** `httpassoca/dotfiles` → `macOS/wallpapers` (branch `main`).
    Download when online, keep a cache, **use the cache when offline**. Pick a wallpaper in the launcher
@@ -40,8 +44,10 @@ the build machine. Keep it current when anything on the TV changes.
 
 ### Ideas discussed, not decided
 
-Race-weekend panel under the clock (CleanYourTV has one for F1 via `race_calendar`), wallpaper sets by time of day (`wallpaper_moods`), sync `config.json` from the
-dotfiles repo like the wallpapers, home-server status dots, a "continue watching" row from a home media server, profiles, and a dssoca SearchPalette on a remote button.
+Race-weekend panel under the clock (CleanYourTV has one for F1 via `race_calendar`), wallpaper sets by time
+of day (`wallpaper_moods`), sync `config.json` from a private repo like the wallpapers, home-server status
+dots, a "continue watching" row from a home media server, profiles, and a dssoca SearchPalette on a remote
+button.
 
 ## Layout of the repo
 
@@ -49,7 +55,7 @@ dotfiles repo like the wallpapers, home-server status dots, a "continue watching
 web/                     design reference: one HTML page + vendored dssoca 0.19 CSS + a wallpaper snapshot
   index.html             sections: 1 config, 2 catalog, 3 store, 4 layout, 5 views, 6 focus, 7 motion, 8 input, 9 boot
   dssoca/                theme.css + vanilla.css from npm dssoca@0.19.0 (Caskaydia @font-face removed)
-  wall-dotfiles/         12 pictures from dotfiles@1fe2db4, 1600x900 JPEG (the page cannot reach GitHub)
+  wall-dotfiles/         gitignored: run web/fetch-wallpapers.sh to download the pictures (third-party art)
 android/                 the TV launcher, Java, no runtime dependencies
   app/src/main/java/dev/passoca/tvhome/
     core/                pure Java, unit-tested; shared logic with web/ (see table below)
@@ -125,7 +131,7 @@ cd android
 adb connect <tv-ip>:5555
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 adb shell cmd package set-home-activity --user 0 dev.passoca.tvhome/.ui.HomeActivity
-adb push config.json /sdcard/Android/data/dev.passoca.tvhome/files/config.json
+adb push ../config.json /sdcard/Android/data/dev.passoca.tvhome/files/config.json
 # undo: pick the original home in Settings, or
 adb shell cmd package set-home-activity --user 0 <stock launcher component>
 ```
@@ -167,7 +173,7 @@ Verified in the build sandbox:
 **Verified on her TV (2026-10-24):** header, dock and grid, input tile, Inputs menu, Help card, Launcher
 settings and the wallpaper picker over it, wallpaper sync from GitHub, panels closed after leaving Home.
 Idle on Home: 1 frame in 20 s, about 0% CPU.
-Performance notes (see important.md): the TV GPU-upscales every app to 4K, so frame count is what matters; keep
+Performance notes (details in the local important.md): the TV GPU-upscales every app to 4K, so frame count is what matters; keep
 animations short. App list loading is parallel; wallpapers are decoded to screen size; launch never waits on motion.
 
 **Not yet verified:**

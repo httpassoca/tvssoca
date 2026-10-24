@@ -1,3 +1,9 @@
 .DS_Store
 *.zip
 *:Zone.Identifier
+
+# Private, kept only on the owner's machines (see README "Files that are not in git")
+/important.md
+/config.json
+# third-party artwork: web/fetch-wallpapers.sh downloads it
+/web/wall-dotfiles/

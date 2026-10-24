@@ -249,8 +249,8 @@ const CONFIG = {
   wallpaper_dim: 45                     // dark overlay over the picture, percent
 };
 /* Wallpaper source: a folder in a GitHub repo. The TV build syncs it into a local cache (download when
-   online, show the cache always). This page cannot reach GitHub, so it ships a snapshot of the folder
-   (commit 1fe2db4, converted to 1600x900 JPEG) in the same shape the cache would hold. */
+   online, show the cache always). The page reads a local copy in wall-dotfiles/, which is not in git
+   (third-party artwork): run web/fetch-wallpapers.sh once to download it as 1600x900 JPEG. */
 const WALLPAPER_SOURCE = {repo:"httpassoca/dotfiles", branch:"main", path:"macOS/wallpapers", snapshot:"1fe2db4"};
 const humanize = f => { const n = f.replace(/\.[a-z]+$/i,"").replace(/^(wp\d+|wallhaven)-/,"").replace(/[-_]+/g," ").trim(); return n.charAt(0).toUpperCase()+n.slice(1); };
 const WALLPAPERS = [

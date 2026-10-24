@@ -1,0 +1,20 @@
+{
+  "dock_apps": [
+    "com.google.android.youtube.tv",
+    "com.netflix.ninja",
+    "com.spotify.tv.android",
+    "input:com.example.tvinput/.PassThroughService/HW16"
+  ],
+  "input_labels": { "input:com.example.tvinput/.PassThroughService/HW16": "Game console" },
+  "columns": 5,
+  "weather": { "latitude": 0.0, "longitude": 0.0, "units": "celsius", "refresh_minutes": 30 },
+  "world_clocks": [{ "label": "Tokyo", "tz": "Asia/Tokyo" }],
+  "wallpaper_source": { "repo": "httpassoca/dotfiles", "branch": "main", "path": "macOS/wallpapers" },
+  "wallpaper_order": "shuffle",
+  "wallpaper_rotation_minutes": 60,
+  "wallpaper_dim": 45,
+  "removed_apps": [
+    { "label": "Some streaming app", "pkg": "com.example.streaming" },
+    { "label": "A preinstalled app", "pkg": "com.example.preinstalled", "system": true }
+  ]
+}
